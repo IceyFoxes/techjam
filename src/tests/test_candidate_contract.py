@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import sys
+import types
+import unittest
+
+from src.infra import CandidateSpec, load_candidate, load_official_cases
+
+
+class CandidateContractTests(unittest.TestCase):
+    def test_loads_explicit_candidate_attribute(self) -> None:
+        module_name = "test_candidates.example"
+        module = types.ModuleType(module_name)
+        expected = CandidateSpec(
+            name="example",
+            model_factory=lambda config: config,
+            owner="test",
+            description="test candidate",
+        )
+        module.SPEC = expected
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+
+        self.assertIs(load_candidate(f"{module_name}:SPEC"), expected)
+
+    def test_rejects_invalid_candidate_name(self) -> None:
+        candidate = CandidateSpec(
+            name="Not Valid",
+            model_factory=lambda config: config,
+            owner="test",
+            description="test candidate",
+        )
+        with self.assertRaisesRegex(ValueError, "candidate name"):
+            candidate.validate()
+
+    def test_rejects_non_spec_export(self) -> None:
+        module_name = "test_candidates.invalid"
+        module = types.ModuleType(module_name)
+        module.CANDIDATE = object()
+        sys.modules[module_name] = module
+        self.addCleanup(sys.modules.pop, module_name, None)
+
+        with self.assertRaisesRegex(TypeError, "must be a CandidateSpec"):
+            load_candidate(module_name)
+
+
+class OfficialCasesTests(unittest.TestCase):
+    def test_disclosed_table_contains_exactly_fourteen_valid_cases(self) -> None:
+        cases = load_official_cases()
+
+        self.assertEqual(list(cases), list(range(1, 15)))
+        self.assertTrue(all(case.causal for case in cases.values()))
+
+    def test_extreme_cases_match_the_appendix(self) -> None:
+        cases = load_official_cases()
+
+        self.assertEqual(cases[6].batch_size, 10000)
+        self.assertEqual(cases[13].seq_len, 1024)
+        self.assertEqual(
+            cases[14].benchmark_config(),
+            {
+                "batch_size": 32,
+                "d_model": 1024,
+                "heads": 16,
+                "seq_len": 100000,
+                "layers": 2,
+                "causal": True,
+                "ffn_dim": 1024,
+            },
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()
