@@ -4,8 +4,14 @@
 
 - Source: Problem statement supplied by the repository owner.
 - Last updated by the organizer: 27 August 2026, 6:25 PM.
-- The referenced image and Feishu-only Appendix test-shape content were not included in the supplied text. Do not infer the missing shapes; add them with their official source when available.
+- Previous source status (superseded 29 August 2026): "The referenced image and
+  Feishu-only Appendix test-shape content were not included in the supplied text.
+  Do not infer the missing shapes; add them with their official source when
+  available."
 - Organizer update: Appendix: Test Shapes added and `torch_transformer_benchmark.py` updated.
+- Organizer Appendix screenshot supplied by the repository owner as
+  [`task_shapes.png`](task_shapes.png) on 29 August 2026. The table is transcribed
+  in Section 3.7 below.
 - Technical Workshop Webinar with Q&A: 28 August 2026, 3:00 PM to 3:45 PM.
 - Webinar recording: stated to be uploaded by 29 August 2026, 12:00 PM.
 
@@ -69,7 +75,9 @@ Participants need to:
 3. Run the script on their own machine.
 4. Provide a clear technical report covering the environment, including CPU, GPU, and disk; optimizations performed; and final test results.
 
-The supplied statement referenced an image after the customized-implementation instruction, but the image was not provided.
+The originally supplied text referenced an image after the
+customized-implementation instruction but did not embed it. The Appendix image is
+now available separately as [`task_shapes.png`](task_shapes.png).
 
 ## 3.3 Constraints and Scope
 
@@ -129,4 +137,36 @@ For backend or NLP tracks where a front-end interface is not applicable, a walkt
 
 ## 3.7 Appendix: Test Shapes
 
-The supplied statement says this content is only supported in Feishu Docs, but it does not contain the test-shape table. The official shape list remains required before shape-specific optimization and complete benchmark validation can be planned.
+### Current status (29 August 2026)
+
+The organizer's Appendix table is available in [`task_shapes.png`](task_shapes.png).
+The table uses `QKV Dim` for the benchmark's `d_model` value. All disclosed cases
+are causal.
+
+| # | Batch Size | QKV Dim (`d_model`) | Heads | Seq Len | Layers | Causal | FFN Dim |
+| ---: | ---: | ---: | ---: | ---: | ---: | :---: | ---: |
+| 1 | 64 | 128 | 4 | 128 | 4 | TRUE | 128 |
+| 2 | 1 | 128 | 4 | 128 | 4 | TRUE | 128 |
+| 3 | 4 | 128 | 4 | 128 | 4 | TRUE | 128 |
+| 4 | 16 | 128 | 4 | 128 | 4 | TRUE | 128 |
+| 5 | 128 | 128 | 4 | 128 | 4 | TRUE | 128 |
+| 6 | 10000 | 128 | 4 | 128 | 4 | TRUE | 128 |
+| 7 | 64 | 32 | 4 | 128 | 4 | TRUE | 32 |
+| 8 | 64 | 1024 | 4 | 128 | 4 | TRUE | 1024 |
+| 9 | 64 | 128 | 1 | 128 | 4 | TRUE | 128 |
+| 10 | 64 | 128 | 2 | 128 | 4 | TRUE | 128 |
+| 11 | 64 | 128 | 16 | 128 | 4 | TRUE | 128 |
+| 12 | 64 | 128 | 4 | 32 | 4 | TRUE | 128 |
+| 13 | 64 | 128 | 4 | 1024 | 4 | TRUE | 128 |
+| 14 | 32 | 1024 | 16 | 100000 | 2 | TRUE | 1024 |
+
+### Previous status (superseded 29 August 2026)
+
+> The supplied statement says this content is only supported in Feishu Docs, but
+> it does not contain the test-shape table. The official shape list remains
+> required before shape-specific optimization and complete benchmark validation
+> can be planned.
+
+This status was superseded when the repository owner supplied the organizer's
+Appendix screenshot. The original wording is retained here as required by the
+repository's non-destructive research policy.
