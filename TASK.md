@@ -4,7 +4,7 @@
 
 - Source: Problem statement supplied by the repository owner.
 - Last updated by the organizer: 27 August 2026, 6:25 PM.
-- The original download links, referenced image, and Feishu-only Appendix test-shape content were not included in the supplied text. Do not infer the missing shapes or links; add them with their official source when available.
+- The referenced image and Feishu-only Appendix test-shape content were not included in the supplied text. Do not infer the missing shapes; add them with their official source when available.
 - Organizer update: Appendix: Test Shapes added and `torch_transformer_benchmark.py` updated.
 - Technical Workshop Webinar with Q&A: 28 August 2026, 3:00 PM to 3:45 PM.
 - Webinar recording: stated to be uploaded by 29 August 2026, 12:00 PM.
@@ -48,15 +48,15 @@ However, the computation of Transformer is expensive. Important operations inclu
 
 In this competition, participants are asked to use AI-assisted methods to optimize the runtime efficiency of a Transformer structure on a given GPU model. The optimized implementation should improve performance while keeping the output numerically correct compared with the reference implementation.
 
-Participants may consider optimization methods such as operator fusion, memory layout optimization, reduced-precision computation, tensor core usage, softmax optimization, and custom CUDA, Triton, TensorFlow, or PyTorch implementations.
+Participants may consider optimization methods such as operator fusion, memory layout optimization, reduced-precision computation, tensor core usage, softmax optimization, and custom CUDA, Triton, or PyTorch implementations.
 
 The goal of this task is to explore how AI can help developers analyze Transformer workloads, identify bottlenecks, and generate more efficient implementations for specific GPU hardware.
 
 ## 3.2 Problem Statement
 
 - Given a fixed formula of a Transformer layer, participants need to submit one or several GPU kernels that implement the layers and pass the given test cases.
-- The test cases will be written in PyTorch or TensorFlow. Participants can modify the layer implementation and decide which parts of the layers should be fused into one kernel.
-- The test case will compare the participant implementation with the original PyTorch or TensorFlow implementation. The difference must satisfy relative error `< 0.02` and absolute error `< 0.002`.
+- The test cases are written in PyTorch. Participants can modify the layer implementation and decide which parts of the layers should be fused into one kernel.
+- The test case will compare the participant implementation with the original PyTorch implementation. As implemented by [`torch_transformer_benchmark.py`](torch_transformer_benchmark.py), each output element passes when its absolute error is at most `0.002` or its error is at most `0.02 * abs(reference)`.
 - Test cases will contain different input shapes, including large and small batch sizes, sequence lengths, and dimensions. Participants can select implementations by shape checks. All input-shape combinations are intended to be disclosed to participants.
 - AI tools are encouraged so participants can implement different kernels for different input shapes in limited time.
 - Optimize and test code on your own machine. Different optimization methods may be appropriate for different GPU models.
@@ -64,7 +64,7 @@ The goal of this task is to explore how AI can help developers analyze Transform
 
 Participants need to:
 
-1. Download either the PyTorch or TensorFlow benchmark script; implementing one framework is sufficient.
+1. Use the repository's [`torch_transformer_benchmark.py`](torch_transformer_benchmark.py) benchmark script.
 2. Implement and optimize the customized-implementation section using AI assistance or by hand.
 3. Run the script on their own machine.
 4. Provide a clear technical report covering the environment, including CPU, GPU, and disk; optimizations performed; and final test results.
@@ -80,12 +80,9 @@ The supplied statement referenced an image after the customized-implementation i
 
 ## 3.4 Available Resources and Data
 
-Participants can download and run one of:
+Use the repository's PyTorch benchmark: [`torch_transformer_benchmark.py`](torch_transformer_benchmark.py).
 
-- PyTorch benchmark: `torch_transformer_benchmark.py`
-- TensorFlow benchmark: `tensorflow_transformer_benchmark.py`
-
-The download URLs were not included in the supplied task text.
+Treat this root benchmark as the immutable reference. Place working implementations under `src/`; if benchmark changes are needed for experimentation, modify a copy under `src/` rather than the original file.
 
 ## 3.5 Deliverables
 

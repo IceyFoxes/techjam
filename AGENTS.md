@@ -2,7 +2,8 @@
 
 ## Start Here
 
-- Read [`TASK.md`](TASK.md) before researching or implementing anything. It is the authority for scope, numerical tolerances, and deliverables.
+- Read [`TASK.md`](TASK.md) before researching or implementing anything. It is the authority for scope and deliverables.
+- Use [`torch_transformer_benchmark.py`](torch_transformer_benchmark.py) as the authoritative benchmark and reference implementation, including executable numerical-correctness behavior.
 - This is a shared research and development repository for the Transformer GPU-kernel task.
 
 ## Research
@@ -18,5 +19,7 @@
 ## Code Changes
 
 - Create a separate branch from the latest `master` for implementation, benchmark, test, build, or runtime configuration changes. Do not commit these changes directly to `master`.
+- Place all working code under `src/`.
+- Do not edit, move, rename, format, or otherwise modify the root `torch_transformer_benchmark.py`. If an editable harness is needed, copy it under `src/` and modify only the copy.
 - Push branch checkpoints frequently and synchronize with `master` without rewriting a shared branch.
 - Submit code through an MR/PR that explains the problem, decision and alternatives, affected behavior, expected performance impact, risks, numerical-correctness evidence, benchmark environment and results, and verification commands.
