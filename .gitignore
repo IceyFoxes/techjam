@@ -1,16 +1,17 @@
-node_modules/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+build/
 dist/
-.env
-.env.production
-.data/
-.local/
-data/
-workspaces/
-codex-home/
-coverage/
+
+# Local and generated artifacts
 *.log
-*.tsbuildinfo
+*.ncu-rep
+*.nsys-rep
 .DS_Store
-deploy/volcengine/.terraform/
-deploy/volcengine/*.tfstate*
-deploy/volcengine/terraform.tfvars
