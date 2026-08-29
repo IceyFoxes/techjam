@@ -121,16 +121,22 @@ this via its `scale=` argument.
 model — folding the scale alone flips cases 7 and 13 to FAIL. In float32 it is
 safe. See [`sdpa-and-precision.md`](sdpa-and-precision.md).
 
-### L3. Exploit causal structure to skip half the work
+### L3. Exploit causal structure to skip half the work — already delivered by SDPA
 
 Every official case has `causal: true`. The reference computes all `N²` scores
 and then discards the strict upper triangle with `masked_fill`. A tiled kernel
 can skip whole blocks above the diagonal entirely, saving close to **50% of both
-the GEMM FLOPs and the score traffic**. FlashAttention-2 lists this as one of its
-three contributions.
+the GEMM FLOPs and the score traffic**.
 
-This lever is *unavailable* to the eager path and is a direct argument for a
-fused kernel over any amount of eager tuning.
+**Measured: the float32 memory-efficient backend already does this.** Timing
+`is_causal=True` against `is_causal=False` gives a ratio of 0.522 at N=2048 and
+0.537 at N=1024, against a theoretical maximum of 0.5. At N=128 the ratio is 0.771
+because block granularity leaves partially-masked diagonal blocks that must be
+computed in full — a limit any block-masked implementation shares.
+
+This lever is unavailable to the *eager* path, so it is a real part of SDPA's
+advantage, but it is **not** an argument for writing a custom kernel: that work is
+already done. See [`fast-attention-survey.md`](fast-attention-survey.md).
 
 ### L4. Online (single-pass) softmax
 
@@ -210,13 +216,21 @@ float32 tolerates comfortably and float16 does not.
    whole-model on case 13** (±3.5%), 1.4-1.7x on cases 1, 7, 12.
 2. **L6 + L7** — bitwise-exact, apply everywhere including shapes where SDPA
    loses. Must hoist the all-true test to one host sync per forward.
-3. **L3 via a custom kernel** — only if profiling after steps 1-2 still shows the
-   upper triangle being computed. This is the main reason to consider Triton, and
-   the only lever SDPA does not already deliver.
+3. **Stage 2/8 layout work, jointly with Person 3.** With L1-L5 delivered by
+   SDPA, the largest remaining attention-adjacent cost is `aten::copy_` +
+   `Memcpy DtoD` at **7.1x the attention matmul** on case 13, from
+   `_split_heads().contiguous()` and the context transpose.
 4. Leave case 8 (`d_h=256`) on the eager path; SDPA regresses to 0.64x there and
    the projections dominate that case anyway (Person 3).
 
-L8 was tested and rejected. Cases 6 and 14 are Person 4's.
+L3 and L8 both turned out not to need work: L3 is already implemented inside
+SDPA, and L8 was measured slower. Cases 6 and 14 are Person 4's. Cases 2, 3 and
+12 are launch-bound and need Person 1's compilation/CUDA-graph work rather than
+attention math.
+
+**A custom Triton kernel is not recommended.** SDPA already provides L1, L3, L4
+and L5; a hand-written kernel would have to beat a mature CUTLASS FMHA
+implementation at its own game. Revisit only against a specific measured gap.
 
 ## Sources
 

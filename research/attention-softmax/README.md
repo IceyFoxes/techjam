@@ -17,6 +17,10 @@ Status: current as of 29 August 2026.
   much of the tolerance budget TF32 has already spent.
 - [`measurements.md`](measurements.md) — environment, operator-level attribution,
   and every measured speedup with its noise floor.
+- [`fast-attention-survey.md`](fast-attention-survey.md) — idea catalogue of ~20
+  fast-attention methods from the literature, each filtered against this task's
+  constraints, plus the measurement showing SDPA already performs causal
+  block-skipping.
 
 ## Conclusions so far
 
@@ -41,6 +45,20 @@ Status: current as of 29 August 2026.
 
 5. **Reduced-precision attention internals were tested and rejected** — they pass
    correctness but are slower than plain float32 SDPA.
+
+6. **SDPA already performs causal block-skipping.** Measured `is_causal=True`
+   against `is_causal=False`: ratio 0.522 at N=2048 and 0.537 at N=1024, against a
+   theoretical maximum of 0.5. Lever L3 is therefore already delivered, which
+   removes the main argument for FlexAttention or a hand-written Triton kernel.
+   The shortfall at N=128 (0.771) is block granularity and would affect any
+   block-masked implementation equally.
+
+7. **The surveyed efficient-attention literature is almost entirely inapplicable.**
+   Every approximate method (Performer, Linformer, Reformer, Longformer, BigBird,
+   Nyströmformer, cosFormer, linear attention, NSA) changes the mathematical
+   result and cannot satisfy a per-element tolerance; Linformer and MQA/GQA
+   additionally break `strict=True` weight loading. Most also target N in the
+   thousands, while our largest in-scope N is 1024.
 
 ## Open questions
 
