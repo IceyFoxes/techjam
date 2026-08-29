@@ -3,3 +3,9 @@
 - [Team coordination](team-coordination/README.md): ownership and integration planning for the four parallel optimization streams.
 - [Projections, FFN, layout, and elementwise fusion](projections-ffn-fusion/README.md):
   Person 3 research decomposition, source review, and optimization decisions.
+- [Attention and softmax](attention-softmax/README.md): Person 2 decomposition of
+  `QK^T`, causal softmax, and `PV` into optimizable stages; the roofline argument
+  that this region is memory-bound; and the measured decision to target float32
+  with `scaled_dot_product_attention`. Includes the finding that float16 fails the
+  precision criterion for any arithmetic reassociation, which constrains all four
+  streams.
