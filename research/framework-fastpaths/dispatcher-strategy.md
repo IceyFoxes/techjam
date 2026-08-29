@@ -27,18 +27,18 @@ benchmark evidence. `Reject` means executable evidence rules the route out.
 
 | Cases | Characteristics | Current preferred route | Status / reason |
 | --- | --- | --- | --- |
-| 1 | ordinary, B=64, D=128, N=128 | float32 SDPA + strided views inside `reduce-overhead` | Candidate composition; compiler-only exploratory 2.713x, padding-safe exploratory check |
+| 1 | ordinary, B=64, D=128, N=128 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.488x, PASS 5/5; padding-safe unit and exploratory checks |
 | 2 | smallest batch, launch-bound | float32 SDPA + strided views inside `reduce-overhead`; dtype fallback | Compiler route **measured** at 6.581x fp32 and 9.250x fp16; max-autotune gives no runtime advantage and less tolerance headroom; integrated SDPA still unmeasured |
-| 3 | small batch, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Candidate composition; compiler-only exploratory 5.193x |
-| 4 | medium batch | float32 SDPA + strided views; compare default vs reduce-overhead | Unmeasured integrated route; do not infer compiler mode from case 3 |
-| 5 | large ordinary batch | float32 SDPA + strided views; default vs reduce-overhead with peak-memory check | Unmeasured integrated route; CUDA Graph workspace may matter |
+| 3 | small batch, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 4.955x, PASS 5/5; exact value has a wide ±53.56% floor |
+| 4 | medium batch | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 4.702x, PASS 5/5; exact value has a wide ±93.73% floor |
+| 5 | large ordinary batch | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.444x, PASS 5/5; peak retained memory still gates CUDA Graph acceptance |
 | 6 | B=10,000 extreme batch | Person 4 memory-safe backend; compile only inside stable chunks | Unmeasured; do not graph-capture full buffers by default |
-| 7 | D=32, head dim 8 | float32 SDPA + strided views inside compiled fusion; dtype-specific fallback | fp16 raw compile **rejected** by exploratory 8/8 failure; cast emulation promising only for this case |
+| 7 | D=32, head dim 8 | float32 SDPA + strided views inside `reduce-overhead`; dtype-specific fallback | Integrated fp32 route **measured** at 3.389x, PASS 5/5; fp16 raw compile remains rejected by exploratory 8/8 failure |
 | 8 | D=1024, head dim 256, GEMM-bound | float32 SDPA + strided views, Person 3 projection backend, optionally `reduce-overhead` | Compiler control **measured** 1.095x; **reject max-autotune** (5/5 failures); corrected Person 2 whole-model result shows SDPA is a small win |
-| 9 | one head, head dim 128 | float32 SDPA + strided views, then compiler comparison | Unmeasured integrated route |
-| 10 | two heads, head dim 64 | float32 SDPA + strided views, then compiler comparison | Unmeasured integrated route |
-| 11 | 16 heads, head dim 8 | float32 SDPA + strided views, then compiler comparison | Unmeasured integrated route; Person 2's SDPA-only route is especially strong |
-| 12 | N=32, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Candidate composition; compiler-only exploratory 4.635x vs 1.850x default |
+| 9 | one head, head dim 128 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.128x, PASS 5/5; exact value has a wide ±45.86% floor |
+| 10 | two heads, head dim 64 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.592x, PASS 5/5 |
+| 11 | 16 heads, head dim 8 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 5.376x, PASS 5/5, with the tightest covered head-variant floor (±10.34%) |
+| 12 | N=32, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 4.227x, PASS 5/5 |
 | 13 | N=1024, memory-bound attention | float32 SDPA + strided views, then compare eager SDPA vs default compile | Compiler control **measured** 3.179x; CUDA Graph adds no credible gain; float16 compiled route rejected |
 | 14 | N=100,000 extreme | Person 4 streaming/chunked backend only | Unmeasured; no full-model compile/CUDA Graph until feasibility and memory are proven |
 
@@ -46,6 +46,11 @@ benchmark evidence. `Reject` means executable evidence rules the route out.
 
 ### Person 2 attention
 
+- Same-machine composition now confirms the float32 SDPA + strided-view route
+  inside `reduce-overhead` on cases 1, 3, 4, 5, 7, and 9-12. All nine pass five
+  seeds, all clear their run-specific noise floors, and their geometric-mean
+  speedup is 3.397x on the RTX 5080. These records replace cross-GPU inference
+  for those exact tuples, while leaving adversarial and memory gates open.
 - Person 2's corrected whole-model sweep shows float32 SDPA passes and gains on
   every in-scope case: about 1.94x geometric mean on the RTX 4060 Laptop GPU.
   The earlier case 8 exclusion was based on a flawed attention-only control that
