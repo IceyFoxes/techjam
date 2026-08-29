@@ -5,6 +5,11 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx4060-85cfd8d/`](2026-08-30-rtx4060-85cfd8d/README.md): Person 2
+  attention mask-route sweep on the pinned cu130 stack. All twelve in-scope
+  cases x `padding_ratio` 0.0/0.3 x two routes, 5/5 seeds each with zero failed
+  elements. Dropping the causal padding key mask is ahead in 20 comparisons,
+  tied in 4, behind in none.
 - [`2026-08-29-rtx5080-12a37c6/`](2026-08-29-rtx5080-12a37c6/README.md):
   three-reference packed-QKV cross-case validation. Universal packing is
   rejected; Case 3 is a new RTX 5080 promotion candidate at 1.192x direct gain,
