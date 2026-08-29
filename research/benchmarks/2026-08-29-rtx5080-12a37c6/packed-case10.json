@@ -1,0 +1,271 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.0010894536972045898,
+    "max_relative_error": 750.2376708984375,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 5242880,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0008542537689208984,
+        "max_relative_error": 750.2376708984375,
+        "mean_abs_error": 9.244716784451157e-05,
+        "optimized_at_worst": -1.8439786434173584,
+        "passed": true,
+        "reference_at_worst": -1.8431243896484375,
+        "seed": 1234,
+        "total_elements": 1048576,
+        "trial": 1,
+        "worst_index": [
+          39,
+          1,
+          13
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0008999109268188477,
+        "max_relative_error": 90.43267059326172,
+        "mean_abs_error": 9.274067269871011e-05,
+        "optimized_at_worst": 0.44211679697036743,
+        "passed": true,
+        "reference_at_worst": 0.4430167078971863,
+        "seed": 1235,
+        "total_elements": 1048576,
+        "trial": 2,
+        "worst_index": [
+          57,
+          1,
+          80
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0010894536972045898,
+        "max_relative_error": 173.59596252441406,
+        "mean_abs_error": 9.296274947701022e-05,
+        "optimized_at_worst": 0.8447552919387817,
+        "passed": true,
+        "reference_at_worst": 0.8458447456359863,
+        "seed": 1236,
+        "total_elements": 1048576,
+        "trial": 3,
+        "worst_index": [
+          52,
+          1,
+          44
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.001076817512512207,
+        "max_relative_error": 142.60006713867188,
+        "mean_abs_error": 9.308157314080745e-05,
+        "optimized_at_worst": -1.1332650184631348,
+        "passed": true,
+        "reference_at_worst": -1.1321882009506226,
+        "seed": 1237,
+        "total_elements": 1048576,
+        "trial": 4,
+        "worst_index": [
+          37,
+          1,
+          79
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0009155869483947754,
+        "max_relative_error": 88.11564636230469,
+        "mean_abs_error": 9.266413690056652e-05,
+        "optimized_at_worst": 0.5753416419029236,
+        "passed": true,
+        "reference_at_worst": 0.5744260549545288,
+        "seed": 1238,
+        "total_elements": 1048576,
+        "trial": 5,
+        "worst_index": [
+          28,
+          2,
+          124
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "description": "Validation-only packed-QKV, strided-view SDPA candidate for every memory-feasible official case; requires external compilation.",
+    "name": "packed-qkv-cross-case-validation",
+    "owner": "Person 1 validation / Person 3 implementation",
+    "selector": "projections:PACKED_ALL",
+    "self_compiling": false,
+    "strict_weight_copy": true,
+    "unsupported_official_cases": [
+      6,
+      14
+    ]
+  },
+  "command": "/home/kevin/techjam/.venv/bin/python /home/kevin/techjam/src/benchmark.py --candidate projections:PACKED_ALL --compile-user --compile-mode reduce-overhead --benchmark-on-failure --case 10 --device cuda --dtype float32 --accuracy-trials 5 --seed 1234 --repeats 30 --settle-seconds 3 --sample-target-ms 50 --output /tmp/techjam-packed-cross-case-12a37c6-3s/packed-case10.json",
+  "config": {
+    "batch_size": 64,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 2,
+    "num_layers": 4,
+    "seq_len": 128
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665912803328,
+      "path": "/home/kevin/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "12a37c621440d3edb2fd6dc9d5affe88cf367f4e",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-29-rtx5080-1234/\n?? research/benchmarks/2026-08-29-rtx5080-12345/"
+  },
+  "input_scale": 1.0,
+  "nvtx_enabled": false,
+  "official_case_id": 10,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.0,
+  "performance": {
+    "baseline": {
+      "mean_ms": 1.3736804598853702,
+      "median_ms": 1.316835185459682,
+      "min_ms": 1.225099836077009,
+      "p90_ms": 1.5317540522984097,
+      "samples_ms": [
+        1.2266414097377232,
+        1.2867154802594867,
+        1.300641850062779,
+        1.2905188424246652,
+        1.2442340305873325,
+        1.264889635358538,
+        1.3183707101004465,
+        1.2360713413783482,
+        1.3709467206682477,
+        1.2416009085518973,
+        1.2884708949497767,
+        1.355792454310826,
+        1.2523355756487164,
+        1.302430180140904,
+        1.3152996608189174,
+        2.0705143519810267,
+        1.596402304513114,
+        1.225099836077009,
+        1.3564059666224888,
+        1.2418230329241071,
+        1.2915848868233817,
+        1.332533918108259,
+        1.3290358407156808,
+        1.4835885184151785,
+        1.4126967293875559,
+        1.472941698346819,
+        1.572000013078962,
+        1.5148260934012276,
+        1.4887186322893415,
+        1.5272822788783482
+      ],
+      "tokens_per_second": 6220975.935678943
+    },
+    "block_size": 35,
+    "candidate": {
+      "mean_ms": 0.5079021108718146,
+      "median_ms": 0.48678171975272044,
+      "min_ms": 0.4538815907069615,
+      "p90_ms": 0.5801729965209962,
+      "samples_ms": [
+        0.4545545033046177,
+        0.4854793003627232,
+        0.4543497085571289,
+        0.5010157448904855,
+        0.49036527361188614,
+        0.4538815907069615,
+        0.467193603515625,
+        0.477960205078125,
+        0.45440823691231863,
+        0.48808413914271764,
+        0.5066020420619419,
+        0.46731060573032923,
+        0.5325686863490513,
+        0.48203610011509485,
+        0.4662473406110491,
+        0.476469966343471,
+        0.45414491380964006,
+        0.5661714281354632,
+        0.45391085488455635,
+        0.5174189976283482,
+        0.4850559779575893,
+        0.45423267909458703,
+        0.5696228572300502,
+        0.5634706224714007,
+        0.6358610425676618,
+        0.5899986267089844,
+        0.5595821925571987,
+        0.5795063018798828,
+        0.5861732482910156,
+        0.5633865356445312
+      ],
+      "tokens_per_second": 16828898.18492248
+    },
+    "gpu_state": {
+      "clocks.mem": "15001",
+      "clocks.sm": "2820",
+      "clocks_throttle_reasons.active": "0x0000000000000400",
+      "power.draw": "192.32",
+      "power.limit": "360.00",
+      "temperature.gpu": "57"
+    },
+    "memory": {
+      "baseline": {
+        "before_allocated_bytes": 41740288,
+        "before_reserved_bytes": 184549376,
+        "incremental_peak_allocated_bytes": 50364416,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 92104704,
+        "peak_reserved_bytes": 184549376
+      },
+      "candidate": {
+        "before_allocated_bytes": 41740288,
+        "before_reserved_bytes": 184549376,
+        "incremental_peak_allocated_bytes": 37748736,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 79489024,
+        "peak_reserved_bytes": 184549376
+      }
+    },
+    "noise_floor_ratio": 0.18161834788626183,
+    "repeats": 30,
+    "settle_seconds": 3.0,
+    "significant": true,
+    "speedup": 2.7051861892608033,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "paired"
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-29T13:45:09.922478+00:00"
+}

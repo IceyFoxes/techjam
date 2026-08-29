@@ -5,6 +5,10 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-29-rtx5080-12a37c6/`](2026-08-29-rtx5080-12a37c6/README.md):
+  three-reference packed-QKV cross-case validation. Universal packing is
+  rejected; Case 3 is a new RTX 5080 promotion candidate at 1.192x direct gain,
+  ±0.84% noise, and PASS 60/60 stress trials.
 - [`2026-08-29-rtx5080-f945daf/`](2026-08-29-rtx5080-f945daf/README.md): merged
   Case-2 packed-QKV checkpoint; PASS 5/5 at 6.191x versus the immutable baseline,
   plus a same-process diagnostic showing a 1.234x incremental gain over the
@@ -21,6 +25,11 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Invalid, Stale, or Superseded Runs
 
+- 29 August 2026: the RTX 4050 Case-3 packed-QKV rejection in
+  [`packed-qkv-exploration.md`](../projections-ffn-fusion/packed-qkv-exploration.md)
+  remains valid for that GPU but is **not portable to the RTX 5080**. The
+  [`12a37c6 cross-case validation`](2026-08-29-rtx5080-12a37c6/README.md)
+  provides contrary hardware-specific evidence: 1.192x, ±0.84%, PASS 60/60.
 - 29 August 2026: the integrated probe at
   [`2026-08-29-rtx5080-330cf60/`](2026-08-29-rtx5080-330cf60/README.md) is valid
   historical evidence but **superseded for final routing** by the exact hardened
