@@ -3,7 +3,8 @@
 ## Start Here
 
 - Read [`TASK.md`](TASK.md) before researching or implementing anything. It is the authority for scope and deliverables.
-- My personal role on this team is recorded in [`MY_ROLE.md`](MY_ROLE.md) (git-ignored) and follows the split in [`research/team-coordination/four-way-team-split.md`](research/team-coordination/four-way-team-split.md). `MY_ROLE.md` may also include a very basic statement on current research progress and aim, and should be updated regularly as research and implementation progresses.
+- My personal role on this team is recorded in [`MY_ROLE.md`](MY_ROLE.md) (git-ignored) and follows the split in [`research/team-coordination/four-way-team-split.md`](research/team-coordination/four-way-team-split.md). `MY_ROLE.md` may also include a very basic statement on current research progress and aim, and should be updated regularly as research and implementation progresses. If the file 
+does not exist, check with the user and add accordingly
 - Use [`torch_transformer_benchmark.py`](torch_transformer_benchmark.py) as the authoritative benchmark and reference implementation, including executable numerical-correctness behavior.
 - This is a shared research and development repository for the Transformer GPU-kernel task.
 
