@@ -77,7 +77,34 @@ class DispatcherPolicyTests(unittest.TestCase):
                 self.assertEqual(route.backend, UNSUPPORTED_BACKEND)
                 self.assertIn("memory-safe", route.reason)
 
-    def test_rejects_unvalidated_runtime_contracts(self):
+    def test_accepts_ampere_and_newer_gpu_models(self):
+        from src.dispatcher import COMPILED_SDPA_BACKEND, select_route
+
+        config = self._config(1)
+        validated = {**self.VALIDATED_CONTRACT, "dtype": torch.float32}
+        contracts = (
+            {
+                **validated,
+                "device_name": "NVIDIA GeForce RTX 4050 Laptop GPU",
+                "device_capability": (8, 9),
+            },
+            {
+                **validated,
+                "device_name": "NVIDIA L4",
+                "device_capability": (8, 9),
+            },
+            {
+                **validated,
+                "device_name": "unrecognized future CUDA GPU",
+                "device_capability": (13, 0),
+            },
+        )
+        for contract in contracts:
+            with self.subTest(contract=contract):
+                route = select_route(config, **contract)
+                self.assertEqual(route.backend, COMPILED_SDPA_BACKEND)
+
+    def test_rejects_unsupported_runtime_contracts(self):
         from src.dispatcher import REFERENCE_BACKEND, select_route
 
         config = self._config(1)
@@ -86,8 +113,8 @@ class DispatcherPolicyTests(unittest.TestCase):
             {**validated, "device_type": "cpu"},
             {**validated, "dtype": torch.float16},
             {**validated, "dtype": torch.bfloat16},
-            {**validated, "device_name": "NVIDIA L4"},
-            {**validated, "device_capability": (8, 9)},
+            {**validated, "device_capability": (7, 5)},
+            {**validated, "device_capability": None},
             {**validated, "torch_version": "2.12.0+cu128"},
             {**validated, "matmul_precision": "highest"},
             {**validated, "allow_tf32": False},
