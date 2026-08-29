@@ -22,6 +22,10 @@ is the executable definition of the required computation and correctness behavio
   and implementation kill criteria.
 - [Packed QKV layout contract](qkv-layout.md): stride analysis, attention
   compatibility, and the shared Person 2/Person 3 interface.
+- [Packed QKV cross-case exploration](packed-qkv-exploration.md): RTX 4050
+  correctness, layout, profiler, and heuristic timing screen against the current
+  SDPA plus strided-view route. Case #2 is the only implementation candidate to
+  survive the compiled whole-model gate.
 - [Feasibility gate: Case #14 memory analysis](feasibility-gate.md): original
   analysis, **stale in part as of 29 August 2026** because it counts a transpose
   view as an allocation, miscounts model weights, and overstates what baseline
@@ -54,3 +58,11 @@ operations. Its historical `1.001x` and `0.999x` measurements demonstrate no
 accepted gain and miss this stream's 15% isolated-fusion threshold. Packed QKV
 remains a future end-to-end layout experiment against the stronger current SDPA
 plus strided-view route, especially for Case #8.
+
+The follow-up cross-case screen rejects that Case #8 hypothesis on the measured
+RTX 4050: packed QKV is numerically identical to the current SDPA route but its
+heuristic whole-model ratio is only 1.003x. Case #2 instead shows repeatable
+approximately 1.19x compiled ratios with zero failures over the 60-trial stress
+matrix. This is exploratory implementation-selection evidence, not an accepted
+benchmark result, because the timing interval remains statistically invalid and
+the validated dispatcher environment is the RTX 5080.
