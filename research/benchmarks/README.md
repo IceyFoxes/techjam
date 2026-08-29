@@ -5,6 +5,12 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-29-l4-f128f6e/`](2026-08-29-l4-f128f6e/README.md): Person 4
+  extreme-memory checkpoint on NVIDIA L4. Official Case 6 passes 1/1 with zero
+  failed elements, 2.487x one-sample speedup, and 2.61 GiB candidate incremental
+  peak allocation. Official Case 14 completes candidate-only in FP16 without
+  OOM at 15.27 GiB peak allocated memory; target-scale numerical correctness is
+  unverified because the immutable dense baseline is not runnable.
 - [`2026-08-29-rtx5080-12a37c6/`](2026-08-29-rtx5080-12a37c6/README.md):
   three-reference packed-QKV cross-case validation. Universal packing is
   rejected; Case 3 is a new RTX 5080 promotion candidate at 1.192x direct gain,
