@@ -25,43 +25,48 @@ rather than synchronizing once per layer.
 whole-model result. `Candidate` means the route still requires integrated
 benchmark evidence. `Reject` means executable evidence rules the route out.
 
+Final status update, 29 August 2026: the hardened dispatcher at `307eedb`
+preserves exact-route evidence for cases 1-5 and 7-13. All pass 5/5 seeds with a
+3.548x geometric mean. This resolves the earlier integrated-evidence gaps for
+cases 2, 8, and 13. Cases 6 and 14 now fail before allocation rather than enter
+an unsafe dense reference fallback.
+
 | Cases | Characteristics | Current preferred route | Status / reason |
 | --- | --- | --- | --- |
-| 1 | ordinary, B=64, D=128, N=128 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.488x, PASS 5/5; padding-safe unit and exploratory checks |
-| 2 | smallest batch, launch-bound | float32 SDPA + strided views inside `reduce-overhead`; dtype fallback | Compiler route **measured** at 6.581x fp32 and 9.250x fp16; max-autotune gives no runtime advantage and less tolerance headroom; integrated SDPA still unmeasured |
-| 3 | small batch, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 4.955x, PASS 5/5; exact value has a wide ±53.56% floor |
-| 4 | medium batch | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 4.702x, PASS 5/5; exact value has a wide ±93.73% floor |
-| 5 | large ordinary batch | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.444x, PASS 5/5; peak retained memory still gates CUDA Graph acceptance |
-| 6 | B=10,000 extreme batch | Person 4 memory-safe backend; compile only inside stable chunks | Unmeasured; do not graph-capture full buffers by default |
-| 7 | D=32, head dim 8 | float32 SDPA + strided views inside `reduce-overhead`; dtype-specific fallback | Integrated fp32 route **measured** at 3.389x, PASS 5/5; fp16 raw compile remains rejected by exploratory 8/8 failure |
-| 8 | D=1024, head dim 256, GEMM-bound | float32 SDPA + strided views, Person 3 projection backend, optionally `reduce-overhead` | Compiler control **measured** 1.095x; **reject max-autotune** (5/5 failures); corrected Person 2 whole-model result shows SDPA is a small win |
-| 9 | one head, head dim 128 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.128x, PASS 5/5; exact value has a wide ±45.86% floor |
-| 10 | two heads, head dim 64 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 2.592x, PASS 5/5 |
-| 11 | 16 heads, head dim 8 | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 5.376x, PASS 5/5, with the tightest covered head-variant floor (±10.34%) |
-| 12 | N=32, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Integrated route **measured** at 4.227x, PASS 5/5 |
-| 13 | N=1024, memory-bound attention | float32 SDPA + strided views, then compare eager SDPA vs default compile | Compiler control **measured** 3.179x; CUDA Graph adds no credible gain; float16 compiled route rejected |
-| 14 | N=100,000 extreme | Person 4 streaming/chunked backend only | Unmeasured; no full-model compile/CUDA Graph until feasibility and memory are proven |
+| 1 | ordinary, B=64, D=128, N=128 | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 2.641x, PASS 5/5; padded smoke also passes |
+| 2 | smallest batch, launch-bound | float32 SDPA + strided views inside `reduce-overhead`; dtype fallback | Final dispatcher **measured** at 7.498x, PASS 5/5; exact value has a wide ±127.86% floor |
+| 3 | small batch, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 4.389x, PASS 5/5 |
+| 4 | medium batch | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 4.081x, PASS 5/5 |
+| 5 | large ordinary batch | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 2.918x, PASS 5/5; candidate peak allocated 107.06 MiB |
+| 6 | B=10,000 extreme batch | Person 4 memory-safe backend; compile only inside stable chunks | Explicitly unsupported before allocation; no memory-safe backend |
+| 7 | D=32, head dim 8 | float32 SDPA + strided views inside `reduce-overhead`; dtype-specific fallback | Final dispatcher **measured** at 3.684x, PASS 5/5; fp16 raw compile remains rejected |
+| 8 | D=1024, head dim 256, GEMM-bound | float32 SDPA + strided views inside `reduce-overhead`; future packed-QKV experiment | Final dispatcher **measured** at 1.118x ±3.90%, PASS 5/5; candidate peak allocated 428.34 MiB |
+| 9 | one head, head dim 128 | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 2.164x, PASS 5/5 |
+| 10 | two heads, head dim 64 | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 2.610x, PASS 5/5 |
+| 11 | 16 heads, head dim 8 | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 5.573x, PASS 5/5 |
+| 12 | N=32, launch-bound | float32 SDPA + strided views inside `reduce-overhead` | Final dispatcher **measured** at 4.263x, PASS 5/5; exact value has a wide ±59.94% floor |
+| 13 | N=1024, memory-bound attention | float32 SDPA + strided views inside default compile | Final dispatcher **measured** at 6.947x, PASS 5/5; candidate peak allocated 1,219.10 MiB |
+| 14 | N=100,000 extreme | Person 4 streaming/chunked backend only | Explicitly unsupported before allocation; baseline score alone is 9.313 TiB in FP16 |
 
 ## Composition Rules
 
 ### Person 2 attention
 
-- Same-machine composition now confirms the float32 SDPA + strided-view route
-  inside `reduce-overhead` on cases 1, 3, 4, 5, 7, and 9-12. All nine pass five
-  seeds, all clear their run-specific noise floors, and their geometric-mean
-  speedup is 3.397x on the RTX 5080. These records replace cross-GPU inference
-  for those exact tuples, while leaving adversarial and memory gates open.
+- Same-machine final-dispatcher evidence now confirms the float32 SDPA +
+  strided-view route on all twelve supported cases. All pass five seeds, all
+  clear their run-specific noise floors, and their geometric-mean speedup is
+  3.548x on the RTX 5080.
 - Person 2's corrected whole-model sweep shows float32 SDPA passes and gains on
   every in-scope case: about 1.94x geometric mean on the RTX 4060 Laptop GPU.
   The earlier case 8 exclusion was based on a flawed attention-only control that
   hoisted mask construction; whole-model case 8 is 1.047x, or 1.119x after
   dropping `.contiguous()` copies.
-- Case 13's leading route is float32 SDPA plus strided views because Person 2
-  measured 6.908x on a different GPU, versus 3.179x for compiler-only on this
-  RTX 5080. The final decision needs same-machine A/B of eager SDPA,
-  default-compiled SDPA, and reduce-overhead SDPA.
-- Case 8 should also use the float32 SDPA route, but its small attention gain and
-  projection-dominated profile make Person 3 composition decisive.
+- Case 13's same-machine final route is resolved: float32 SDPA plus strided
+  views inside default compile measures 6.947x, with lower peak allocation than
+  baseline. CUDA Graph replay remains disabled for this route.
+- Case 8 uses the proven float32 SDPA route at 1.118x. Its small gain and
+  projection-dominated profile make it the primary future packed-QKV target,
+  but Person 3's current functional FFN control must not be integrated.
 - Float16 fused attention and whole-model compile have independent numerical
   failures. A pass by one does not authorize the other.
 
@@ -116,6 +121,12 @@ A route enters the dispatcher only when it has:
    14;
 5. graph-break/recompile logs showing stable capture after warmup; and
 6. an eager-compatible fallback for every key it does not explicitly support.
+
+The `307eedb` checkpoint satisfies the ordinary five-seed, target-contract,
+whole-model timing, graph-replay warmup, and supported-case memory gates. It
+does not yet satisfy adversarial input-scale/padding coverage. Cases 6 and 14
+are outside this promotion because an eager-compatible dense fallback is not
+memory-safe at their shapes.
 
 ## Sources
 

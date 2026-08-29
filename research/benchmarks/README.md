@@ -5,6 +5,9 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-29-rtx5080-307eedb/`](2026-08-29-rtx5080-307eedb/README.md): final
+  hardened dispatcher evidence for all twelve supported cases on the RTX 5080;
+  PASS 5/5 on every case, 3.548x geometric mean, and CUDA peak-memory records.
 - [`2026-08-29-rtx5080-330cf60/`](2026-08-29-rtx5080-330cf60/README.md): Person 1
   integrated float32 SDPA, strided-view, and `reduce-overhead` evidence for
   cases 1, 3, 4, 5, 7, and 9-12; all nine pass 5/5 seeds and show significant
@@ -14,6 +17,11 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Invalid, Stale, or Superseded Runs
 
+- 29 August 2026: the integrated probe at
+  [`2026-08-29-rtx5080-330cf60/`](2026-08-29-rtx5080-330cf60/README.md) is valid
+  historical evidence but **superseded for final routing** by the exact hardened
+  dispatcher records at `307eedb`. Preserve it as the pre-dispatch composition
+  checkpoint.
 - 29 August 2026: [`2026-08-29-rtx4050-optimization-wave1.md`](2026-08-29-rtx4050-optimization-wave1.md)
   is **stale exploratory evidence**. It predates the paired, settled timing
   correction and omits exact commands, timestamps, dtype, raw samples, timing

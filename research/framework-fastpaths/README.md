@@ -4,10 +4,10 @@ Research for Person 1's ownership: framework compilation, CUDA Graphs, and the
 final shape-aware dispatcher. The immutable benchmark remains
 [`torch_transformer_benchmark.py`](../../torch_transformer_benchmark.py).
 
-Status: current as of 29 August 2026. This directory is research, not accepted
-implementation. The evidence probe lives on branch
-`impl/person1-integrated-probe` at `330cf60`; final code must remain on an
-implementation branch and be revalidated after Person 3 kernels are integrated.
+Status: current as of 29 August 2026. The hardened dispatcher implementation is
+at branch commit `307eedb` in PR #6. Final preserved evidence covers all twelve
+supported cases; Person 3 has no accepted backend to integrate, and cases 6/14
+remain explicitly unsupported pending memory-safe execution.
 
 ## Documents
 
@@ -25,11 +25,10 @@ implementation branch and be revalidated after Person 3 kernels are integrated.
 1. **Smart dispatch is required.** The disclosed shapes are fixed and may be
    selected explicitly, while the measured best compiler mode and even numerical
    validity vary by shape and dtype. There is no defensible universal route.
-2. **The first integrated route works across nine additional cases.** Float32
-   SDPA with strided Q/K/V views inside `reduce-overhead` passes 5/5 seeds on
-   cases 1, 3, 4, 5, 7, and 9-12. Every improvement clears its run-specific
-   noise floor; the speedups range from 2.128x to 5.376x with a 3.397x geometric
-   mean on the RTX 5080.
+2. **The hardened dispatcher covers all twelve supported cases.** Float32 SDPA
+   with strided Q/K/V views and shape-specific compilation passes 5/5 seeds on
+   cases 1-5 and 7-13. Every improvement clears its run-specific noise floor;
+   speedups range from 1.118x to 7.498x with a 3.548x geometric mean.
 3. **`reduce-overhead` is the leading launch-bound route.** On case 2 float32 it
    measured 6.581x versus 2.212x for default mode. `max-autotune` measured 6.609x,
    an indistinguishable runtime result with more numerical error and much more
@@ -59,9 +58,9 @@ implementation branch and be revalidated after Person 3 kernels are integrated.
 - Use `reduce-overhead` only for measured launch-bound routes; use default compile
   for case 13 until the SDPA composition is measured; reject `max-autotune` by
   default.
-- Use the measured SDPA + strided-view + `reduce-overhead` composition as the
-  leading branch baseline for cases 1, 3, 4, 5, 7, and 9-12; extend its
-  correctness matrix and add the required case-5 peak-memory evidence.
-- Integrate Person 3's packed-projection candidates where they win, then
-  remeasure each complete route. Compiler-only numbers remain controls for
-  cases 2, 8, and 13 until same-machine SDPA composition is recorded.
+- Use the measured hardened dispatcher as the leading implementation for cases
+  1-5 and 7-13. Extend its input-scale/padding matrix; peak-memory evidence is
+  now present for cases 5, 8, and 13.
+- Treat Person 3's current functional FFN as a rejected control. Attempt packed
+  QKV only as an end-to-end case-8 experiment against the 1.118x dispatcher
+  route, then remeasure if it wins.

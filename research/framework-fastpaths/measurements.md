@@ -1,5 +1,22 @@
 # RTX 5080 Compiler Measurements
 
+## Final Hardened Dispatcher Checkpoint
+
+The exact self-compiling dispatcher at implementation commit `307eedb` now has
+preserved whole-model records for all twelve supported official cases. Every
+case passes five of five float32 seeds, every gain clears its run-specific noise
+floor, and the geometric-mean speedup is **3.548x**. Cases 6 and 14 are explicitly
+rejected before allocation because no memory-safe backend exists.
+
+The final records supersede the probe and compiler-only controls for routing
+decisions. They also add warmed-process CUDA peak-memory measurements; on cases
+5, 8, and 13, candidate peak allocated memory is lower than baseline. See
+[`../benchmarks/2026-08-29-rtx5080-307eedb/`](../benchmarks/2026-08-29-rtx5080-307eedb/README.md).
+
+| Cases | Speedup range | Geomean | Accuracy | Status |
+| --- | ---: | ---: | --- | --- |
+| 1-5, 7-13 | 1.118x-7.498x | 3.548x | PASS 5/5 each | Final dispatcher checkpoint |
+
 ## Integrated Nine-Case Checkpoint
 
 On 29 August 2026, the implementation probe at branch commit `330cf60` composed
@@ -24,7 +41,9 @@ speedup is 3.397x. Full raw evidence and method are in
 | 11 | 6.2062 | 1.1544 | 5.376x | ±10.34% | PASS 5/5 |
 | 12 | 0.8274 | 0.1957 | 4.227x | ±21.76% | PASS 5/5 |
 
-This supersedes the 29 August exploratory-only status for these nine cases.
+This superseded the 29 August exploratory-only status for these nine cases and
+was itself superseded for final routing by the hardened dispatcher checkpoint
+above. It remains valid composition evidence.
 Exact values for cases 3, 4, and 9 remain noisy because the candidate paths are
 sub-millisecond. The route is nevertheless a strong dispatcher baseline for
 each exact tuple; adversarial correctness, padding timing, graph-stability, and
@@ -135,9 +154,8 @@ integrated records above.
   shapes require a memory-safe backend before this compiler route is attempted.
 - The case 2 fp16 pass is only eight Gaussian seeds at the default input scale
   and zero padding; it is not an acceptance-quality adversarial matrix.
-- Nine cases now compose `reduce-overhead` with Person 2's SDPA/view approach;
-  cases 2, 8, and 13 still need same-machine integrated comparison, and no
-  measurement yet includes Person 3 packed projections.
+- All twelve supported cases now have same-machine exact-dispatcher evidence;
+  no measurement yet includes Person 3 packed projections.
 - CUDA Graph retained-memory cost must be measured before using it on cases 5,
   6, 8, 13, or 14.
 
