@@ -2,8 +2,9 @@
 
 The evaluator constructs the model on CPU, copies reference weights, and only
 then moves it to the final device and dtype. Compilation is therefore lazy and
-per model instance. Unsupported runtime contracts use the executable reference
-arithmetic rather than silently trying an unvalidated fast path.
+per model instance. Unvalidated runtime contracts use the executable reference
+arithmetic. Extreme cases 6 and 14 fail before dense execution because that
+fallback is itself unsafe at their disclosed sizes.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ ForwardCallable = Callable[[torch.Tensor, Optional[torch.Tensor]], torch.Tensor]
 
 REFERENCE_BACKEND = "reference"
 COMPILED_SDPA_BACKEND = "compiled-sdpa"
+UNSUPPORTED_BACKEND = "unsupported"
 
 # Cases 6 and 14 are intentionally absent. Their extreme batch/sequence sizes
 # need the separately owned memory-safe backend before they can be promoted.
@@ -47,10 +49,13 @@ CASE_COMPILE_MODES: Dict[int, str] = {
     13: "default",
 }
 
-# The route is measured on capability 12.0 (RTX 5080). SDPA and Inductor are
-# mature on Ampere and newer; older/unknown CUDA capabilities take the exact
-# reference path until separately validated.
-MIN_COMPILED_CUDA_CAPABILITY = (8, 0)
+# This is the complete hardware/software/numerical contract of the preserved
+# dispatcher evidence. Broader CUDA-family support needs its own validation.
+VALIDATED_DEVICE_NAME = "NVIDIA GeForce RTX 5080"
+VALIDATED_CUDA_CAPABILITY = (12, 0)
+VALIDATED_TORCH_VERSION = "2.13.0+cu130"
+VALIDATED_MATMUL_PRECISION = "high"
+VALIDATED_ALLOW_TF32 = True
 
 
 def _config_key(config: TransformerConfig) -> ConfigKey:
@@ -101,6 +106,7 @@ class RuntimeKey:
     device_type: str
     device_index: Optional[int]
     dtype: torch.dtype
+    device_name: Optional[str]
     device_capability: Optional[Tuple[int, int]]
     mask_present: bool
     inference_mode: bool
@@ -109,12 +115,29 @@ class RuntimeKey:
     allow_tf32: bool
 
 
+@dataclass(frozen=True)
+class CachedForward:
+    """One runtime-key callable and whether it still needs failure guarding."""
+
+    function: ForwardCallable
+    compiled: bool
+    case_id: Optional[int]
+
+
+class UnsupportedCaseError(RuntimeError):
+    """Raised before an extreme case can enter the dense reference path."""
+
+
 def select_route(
     config: TransformerConfig,
     *,
     device_type: str,
     dtype: torch.dtype,
+    device_name: Optional[str],
     device_capability: Optional[Tuple[int, int]],
+    torch_version: str,
+    matmul_precision: str,
+    allow_tf32: bool,
 ) -> RouteDecision:
     """Select only routes validated for the complete official configuration."""
 
@@ -129,9 +152,9 @@ def select_route(
     if case_id not in CASE_COMPILE_MODES:
         return RouteDecision(
             case_id,
-            REFERENCE_BACKEND,
+            UNSUPPORTED_BACKEND,
             None,
-            "extreme case requires a memory-safe backend",
+            "extreme case has no memory-safe backend",
         )
     if device_type != "cuda":
         return RouteDecision(
@@ -147,15 +170,36 @@ def select_route(
             None,
             "only float32 has integrated numerical evidence",
         )
+    if device_name != VALIDATED_DEVICE_NAME:
+        return RouteDecision(
+            case_id,
+            REFERENCE_BACKEND,
+            None,
+            "GPU model is outside the preserved dispatcher evidence",
+        )
+    if device_capability != VALIDATED_CUDA_CAPABILITY:
+        return RouteDecision(
+            case_id,
+            REFERENCE_BACKEND,
+            None,
+            "CUDA capability is outside the preserved dispatcher evidence",
+        )
+    if torch_version != VALIDATED_TORCH_VERSION:
+        return RouteDecision(
+            case_id,
+            REFERENCE_BACKEND,
+            None,
+            "PyTorch build is outside the preserved dispatcher evidence",
+        )
     if (
-        device_capability is None
-        or device_capability < MIN_COMPILED_CUDA_CAPABILITY
+        matmul_precision != VALIDATED_MATMUL_PRECISION
+        or allow_tf32 != VALIDATED_ALLOW_TF32
     ):
         return RouteDecision(
             case_id,
             REFERENCE_BACKEND,
             None,
-            "CUDA capability is outside the validated compiler family",
+            "matmul numerical flags are outside the validated contract",
         )
     if not callable(getattr(torch, "compile", None)):
         return RouteDecision(
@@ -234,8 +278,12 @@ class DispatchingTransformer(BaselineTransformer):
                 config.num_heads,
             )
 
-        self._compiled_forwards: Dict[RuntimeKey, ForwardCallable] = {}
+        self._compiled_forwards: Dict[RuntimeKey, CachedForward] = {}
         self._compile_failures: Dict[RuntimeKey, str] = {}
+        self._device_contracts: Dict[
+            Tuple[str, Optional[int]],
+            Tuple[Optional[str], Optional[Tuple[int, int]]],
+        ] = {}
         self._last_route: Optional[RouteDecision] = None
 
     @property
@@ -255,6 +303,7 @@ class DispatchingTransformer(BaselineTransformer):
 
         self._compiled_forwards.clear()
         self._compile_failures.clear()
+        self._device_contracts.clear()
         self._last_route = None
 
     def _apply(
@@ -372,23 +421,37 @@ class DispatchingTransformer(BaselineTransformer):
             x = x.masked_fill(~valid_token_mask[..., None], 0)
         return x
 
-    @staticmethod
-    def _device_capability(device: torch.device) -> Optional[Tuple[int, int]]:
+    def _device_contract(
+        self,
+        device: torch.device,
+    ) -> Tuple[Optional[str], Optional[Tuple[int, int]]]:
+        cache_key = (device.type, device.index)
+        cached = self._device_contracts.get(cache_key)
+        if cached is not None:
+            return cached
         if device.type != "cuda" or not torch.cuda.is_available():
-            return None
-        return torch.cuda.get_device_capability(device)
+            contract = (None, None)
+        else:
+            contract = (
+                torch.cuda.get_device_name(device),
+                torch.cuda.get_device_capability(device),
+            )
+        self._device_contracts[cache_key] = contract
+        return contract
 
     def _runtime_key(
         self,
         x: torch.Tensor,
         valid_token_mask: Optional[torch.Tensor],
     ) -> RuntimeKey:
+        device_name, device_capability = self._device_contract(x.device)
         return RuntimeKey(
             input_shape=tuple(x.shape),
             device_type=x.device.type,
             device_index=x.device.index,
             dtype=x.dtype,
-            device_capability=self._device_capability(x.device),
+            device_name=device_name,
+            device_capability=device_capability,
             mask_present=valid_token_mask is not None,
             inference_mode=torch.is_inference_mode_enabled(),
             grad_enabled=torch.is_grad_enabled(),
@@ -417,8 +480,34 @@ class DispatchingTransformer(BaselineTransformer):
             self.config,
             device_type=key.device_type,
             dtype=key.dtype,
+            device_name=key.device_name,
             device_capability=key.device_capability,
+            torch_version=torch.__version__,
+            matmul_precision=key.matmul_precision,
+            allow_tf32=key.allow_tf32,
         )
+
+    def _demote_compile_failure(
+        self,
+        key: RuntimeKey,
+        case_id: Optional[int],
+        error: Exception,
+        x: torch.Tensor,
+        valid_token_mask: Optional[torch.Tensor],
+    ) -> torch.Tensor:
+        self._compile_failures[key] = f"{type(error).__name__}: {error}"
+        self._compiled_forwards[key] = CachedForward(
+            self._forward_reference,
+            compiled=False,
+            case_id=case_id,
+        )
+        self._last_route = RouteDecision(
+            case_id,
+            REFERENCE_BACKEND,
+            None,
+            "compiled call failed; using reference fallback",
+        )
+        return self._forward_reference(x, valid_token_mask)
 
     def forward(
         self,
@@ -428,12 +517,31 @@ class DispatchingTransformer(BaselineTransformer):
         key = self._runtime_key(x, valid_token_mask)
         cached = self._compiled_forwards.get(key)
         if cached is not None:
-            return cached(x, valid_token_mask)
+            if not cached.compiled:
+                return cached.function(x, valid_token_mask)
+            try:
+                return cached.function(x, valid_token_mask)
+            except Exception as error:
+                return self._demote_compile_failure(
+                    key,
+                    cached.case_id,
+                    error,
+                    x,
+                    valid_token_mask,
+                )
 
         route = self._resolve_route(key)
         self._last_route = route
+        if route.backend == UNSUPPORTED_BACKEND:
+            raise UnsupportedCaseError(
+                f"official case {route.case_id} is unsupported: {route.reason}"
+            )
         if route.backend == REFERENCE_BACKEND:
-            self._compiled_forwards[key] = self._forward_reference
+            self._compiled_forwards[key] = CachedForward(
+                self._forward_reference,
+                compiled=False,
+                case_id=route.case_id,
+            )
             return self._forward_reference(x, valid_token_mask)
 
         assert route.compile_mode is not None
@@ -443,21 +551,24 @@ class DispatchingTransformer(BaselineTransformer):
                 self._compile_entrypoint(route.case_id),
                 mode=route.compile_mode,
             )
-            # Inductor compilation is lazy. Execute once here so a first-call
-            # backend failure can atomically demote this runtime key.
+            # Inductor and CUDA Graph setup are lazy. A disposable first result
+            # exercises compilation; the second call exercises graph replay.
+            compiled(x, valid_token_mask)
             output = compiled(x, valid_token_mask)
         except Exception as error:
-            self._compile_failures[key] = f"{type(error).__name__}: {error}"
-            self._compiled_forwards[key] = self._forward_reference
-            self._last_route = RouteDecision(
+            return self._demote_compile_failure(
+                key,
                 route.case_id,
-                REFERENCE_BACKEND,
-                None,
-                "lazy compilation failed; using reference fallback",
+                error,
+                x,
+                valid_token_mask,
             )
-            return self._forward_reference(x, valid_token_mask)
 
-        self._compiled_forwards[key] = compiled
+        self._compiled_forwards[key] = CachedForward(
+            compiled,
+            compiled=True,
+            case_id=route.case_id,
+        )
         return output
 
 
@@ -469,4 +580,6 @@ CANDIDATE = CandidateSpec(
         "Lazy twelve-case float32 CUDA dispatcher: strided-view SDPA with "
         "shape-specific compile modes and an exact reference fallback."
     ),
+    self_compiling=True,
+    unsupported_official_cases=(6, 14),
 )
