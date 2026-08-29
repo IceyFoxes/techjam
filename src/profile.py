@@ -16,7 +16,12 @@ from typing import Any, Dict, Iterable, Tuple
 import torch
 
 import torch_transformer_benchmark as reference
-from src.infra import CandidateSpec, load_candidate, load_official_cases
+from src.infra import (
+    CandidateSpec,
+    load_candidate,
+    load_official_cases,
+    validate_candidate_execution,
+)
 from src.infra.environment import collect_environment, collect_git
 
 
@@ -207,6 +212,11 @@ def _selected_models(
 def main() -> int:
     args = parse_args()
     spec = load_candidate(args.candidate)
+    validate_candidate_execution(
+        spec,
+        args.case,
+        compile_user=args.compile_user,
+    )
     if args.output_dir is None:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         args.output_dir = (
@@ -259,6 +269,8 @@ def main() -> int:
             "owner": spec.owner,
             "description": spec.description,
             "strict_weight_copy": strict,
+            "self_compiling": spec.self_compiling,
+            "unsupported_official_cases": list(spec.unsupported_official_cases),
         },
         "official_case_id": args.case,
         "config": asdict(config),

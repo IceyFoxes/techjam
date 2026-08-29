@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import re
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Tuple
 
 
 ModelFactory = Callable[[Any], Any]
@@ -27,6 +27,8 @@ class CandidateSpec:
     description: str
     weight_loader: Optional[WeightLoader] = None
     strict_weight_copy: bool = True
+    self_compiling: bool = False
+    unsupported_official_cases: Tuple[int, ...] = ()
 
     def validate(self) -> None:
         if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", self.name):
@@ -38,6 +40,21 @@ class CandidateSpec:
             raise TypeError("candidate model_factory must be callable")
         if self.weight_loader is not None and not callable(self.weight_loader):
             raise TypeError("candidate weight_loader must be callable")
+        if not isinstance(self.self_compiling, bool):
+            raise TypeError("candidate self_compiling must be a bool")
+        if not isinstance(self.unsupported_official_cases, tuple):
+            raise TypeError("candidate unsupported_official_cases must be a tuple")
+        if any(
+            not isinstance(case_id, int) or not 1 <= case_id <= 14
+            for case_id in self.unsupported_official_cases
+        ):
+            raise ValueError(
+                "unsupported official cases must contain only ids 1 through 14"
+            )
+        if len(set(self.unsupported_official_cases)) != len(
+            self.unsupported_official_cases
+        ):
+            raise ValueError("unsupported official cases must not contain duplicates")
 
 
 def load_candidate(selector: str) -> CandidateSpec:
@@ -70,3 +87,23 @@ def load_candidate(selector: str) -> CandidateSpec:
         )
     candidate.validate()
     return candidate
+
+
+def validate_candidate_execution(
+    spec: CandidateSpec,
+    official_case_id: Optional[int],
+    *,
+    compile_user: bool,
+) -> None:
+    """Reject evaluator options that violate a candidate's declared contract."""
+
+    if spec.self_compiling and compile_user:
+        raise ValueError(
+            f"candidate {spec.name!r} compiles itself; remove --compile-user "
+            "to avoid nested compilation"
+        )
+    if official_case_id in spec.unsupported_official_cases:
+        raise ValueError(
+            f"candidate {spec.name!r} explicitly does not support official "
+            f"case {official_case_id}; refusing before model/input allocation"
+        )
