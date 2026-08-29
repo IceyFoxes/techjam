@@ -2,7 +2,24 @@
 
 ## Planning Status
 
-The numbered shapes, shape characteristics, dimensions, and performance targets below are internal planning assumptions supplied by the repository owner. The official test-shape table is not available in this repository; do not treat these assumptions as organizer-confirmed requirements.
+### Current status (29 August 2026)
+
+The numbered shape values and characteristics below match the organizer Appendix
+screenshot supplied as [`task_shapes.png`](../../task_shapes.png) and transcribed
+in [`TASK.md`](../../TASK.md#37-appendix-test-shapes). The performance targets and
+work allocation remain internal team planning decisions, not organizer
+requirements.
+
+### Previous status (superseded 29 August 2026)
+
+> The numbered shapes, shape characteristics, dimensions, and performance targets
+> below are internal planning assumptions supplied by the repository owner. The
+> official test-shape table is not available in this repository; do not treat
+> these assumptions as organizer-confirmed requirements.
+
+This status was superseded because the supplied Appendix confirms the shape
+values. It is retained here under the repository's non-destructive research
+policy.
 
 ## Person 1: Framework Fast Paths, Compilation, and Integration
 
