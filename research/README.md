@@ -16,3 +16,4 @@
 - [Benchmark records](benchmarks/README.md): preserved baseline, accepted
   checkpoint, regression, and final runs, including validity status and
   replacement links.
+- [Extreme-shape memory](extreme-memory/README.md): Person 4 analysis of OOM failure modes, the benchmark-harness blocker, and an exact streaming execution strategy.
