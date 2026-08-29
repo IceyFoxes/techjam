@@ -11,6 +11,7 @@ build/
 dist/
 
 # Local and generated artifacts
+artifacts/profiles/
 *.log
 *.ncu-rep
 *.nsys-rep
