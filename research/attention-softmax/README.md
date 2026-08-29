@@ -94,6 +94,10 @@ Status: current as of 29 August 2026.
 
 - Cases 6 (`B=10000`) and 14 (`N=100000`) are **Person 4's** extreme-shape memory
   scope and are excluded from these documents.
+- **For Person 4 (30 August 2026):** the section 3 result applies to cases 6 and
+  14 as well. Under causal attention with right padding, no padding mask need
+  ever be built, which removes a `B x N` term from any chunked design and one
+  full read+write of the score block per chunk.
 - Stages 2 and 8 (head reshape and `.contiguous()`) are shared with Person 3 and
   should be negotiated rather than changed unilaterally.
 - Case 8 is projection-bound (`aten::addmm` 31.5%, `bmm` 3.1%) and belongs to

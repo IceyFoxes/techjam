@@ -153,6 +153,17 @@ is how much faster dropping the mask is than keeping it.
 zero failed elements, and `max_abs` is identical between the two routes within
 each case — independent confirmation that the mask contributes nothing.
 
+**Confirmed under the official harness.** The table above is an in-process A/B
+where both candidates share one interleaved baseline. Re-run through
+`src.benchmark`, which measures each route in its own process against its own
+baseline, drop-mask is ahead in **20** comparisons, **tied in 4**, and behind in
+**none**, with 5/5 seeds passing in all 24 cells. Preserved records, and the
+caveats on how to read them, are in
+[`../benchmarks/2026-08-30-rtx4060-85cfd8d/`](../benchmarks/2026-08-30-rtx4060-85cfd8d/README.md).
+The four ties (cases 1, 5, 8 and 11, one padding ratio each) are shapes where
+attention is a small share of device time or the noise floor is wide; none is a
+reversal.
+
 Read this table with its floors in mind. The trustworthy rows are the large
 shapes: case 8 (±0.5-1.0%), case 13 (±1.9-2.2%) and case 5 (±3.0-4.0%), all
 consistently positive. Cases 1, 4, 9, 10, 11 and 12 carry floors of ±5-23%, so no
