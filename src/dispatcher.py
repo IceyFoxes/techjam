@@ -49,10 +49,10 @@ CASE_COMPILE_MODES: Dict[int, str] = {
     13: "default",
 }
 
-# This is the complete hardware/software/numerical contract of the preserved
-# dispatcher evidence. Broader CUDA-family support needs its own validation.
-VALIDATED_DEVICE_NAME = "NVIDIA GeForce RTX 5080"
-VALIDATED_CUDA_CAPABILITY = (12, 0)
+# SDPA and Inductor are available across the Ampere-and-newer CUDA family. The
+# preserved performance evidence remains RTX 5080-specific, but other devices
+# in this compiler family may attempt the route and retain failure fallback.
+MIN_COMPILED_CUDA_CAPABILITY = (8, 0)
 VALIDATED_TORCH_VERSION = "2.13.0+cu130"
 VALIDATED_MATMUL_PRECISION = "high"
 VALIDATED_ALLOW_TF32 = True
@@ -170,19 +170,15 @@ def select_route(
             None,
             "only float32 has integrated numerical evidence",
         )
-    if device_name != VALIDATED_DEVICE_NAME:
+    if (
+        device_capability is None
+        or device_capability < MIN_COMPILED_CUDA_CAPABILITY
+    ):
         return RouteDecision(
             case_id,
             REFERENCE_BACKEND,
             None,
-            "GPU model is outside the preserved dispatcher evidence",
-        )
-    if device_capability != VALIDATED_CUDA_CAPABILITY:
-        return RouteDecision(
-            case_id,
-            REFERENCE_BACKEND,
-            None,
-            "CUDA capability is outside the preserved dispatcher evidence",
+            "CUDA capability is below the supported compiler family",
         )
     if torch_version != VALIDATED_TORCH_VERSION:
         return RouteDecision(
@@ -212,7 +208,7 @@ def select_route(
         case_id,
         COMPILED_SDPA_BACKEND,
         CASE_COMPILE_MODES[case_id],
-        "validated official float32 CUDA route",
+        "eligible official float32 CUDA route",
     )
 
 

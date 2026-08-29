@@ -100,13 +100,16 @@ two compiler wrappers:
   --candidate src.dispatcher --case 2 --device cuda --dtype float32
 ```
 
-Under the preserved RTX 5080, PyTorch 2.13.0+cu130, float32, high-matmul-precision,
-TF32-enabled contract, official cases 1-5 and 7-12 use strided-view SDPA inside
-`reduce-overhead`; case 13 uses the same SDPA path with ordinary/default
-compilation. The complete official tuple and runtime contract are matched before
-selecting a route. Non-float32 inputs, CPU, other GPU/software contracts,
-non-official configurations, mismatched runtime shapes, unavailable compilation,
-and compiler failures use exact reference arithmetic.
+On CUDA GPUs with compute capability 8.0 or newer, under the PyTorch
+2.13.0+cu130, float32, high-matmul-precision, TF32-enabled contract, official
+cases 1-5 and 7-12 use strided-view SDPA inside `reduce-overhead`; case 13 uses
+the same SDPA path with ordinary/default compilation. Performance evidence is
+currently specific to the RTX 5080; other eligible GPUs may produce different
+speedups. The complete official tuple and runtime contract are matched before
+selecting a route. Non-float32 inputs, CPU, older/unknown CUDA capabilities,
+other software contracts, non-official configurations, mismatched runtime
+shapes, unavailable compilation, and compiler failures use exact reference
+arithmetic.
 
 Cases 6 and 14 are different: dense reference execution is itself unsafe at
 their extreme sizes, so the harness rejects them before model or input
