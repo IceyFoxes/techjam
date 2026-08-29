@@ -12,6 +12,16 @@ except ImportError:  # pragma: no cover - dependency-free environments
 
 @unittest.skipIf(torch is None, "PyTorch is not installed")
 class DispatcherPolicyTests(unittest.TestCase):
+    VALIDATED_CONTRACT = {
+        "device_type": "cuda",
+        "dtype": None,
+        "device_name": "NVIDIA GeForce RTX 5080",
+        "device_capability": (12, 0),
+        "torch_version": "2.13.0+cu130",
+        "matmul_precision": "high",
+        "allow_tf32": True,
+    }
+
     @staticmethod
     def _config(case_id: int):
         from src.infra import load_official_cases
@@ -49,37 +59,38 @@ class DispatcherPolicyTests(unittest.TestCase):
             with self.subTest(case=case_id):
                 route = select_route(
                     self._config(case_id),
-                    device_type="cuda",
-                    dtype=torch.float32,
-                    device_capability=(12, 0),
+                    **{**self.VALIDATED_CONTRACT, "dtype": torch.float32},
                 )
                 self.assertEqual(route.case_id, case_id)
                 self.assertEqual(route.backend, COMPILED_SDPA_BACKEND)
                 self.assertEqual(route.compile_mode, mode)
 
-    def test_routes_extreme_cases_to_reference(self):
-        from src.dispatcher import REFERENCE_BACKEND, select_route
+    def test_marks_extreme_cases_unsupported(self):
+        from src.dispatcher import UNSUPPORTED_BACKEND, select_route
 
         for case_id in (6, 14):
             with self.subTest(case=case_id):
                 route = select_route(
                     self._config(case_id),
-                    device_type="cuda",
-                    dtype=torch.float32,
-                    device_capability=(12, 0),
+                    **{**self.VALIDATED_CONTRACT, "dtype": torch.float32},
                 )
-                self.assertEqual(route.backend, REFERENCE_BACKEND)
+                self.assertEqual(route.backend, UNSUPPORTED_BACKEND)
                 self.assertIn("memory-safe", route.reason)
 
     def test_rejects_unvalidated_runtime_contracts(self):
         from src.dispatcher import REFERENCE_BACKEND, select_route
 
         config = self._config(1)
+        validated = {**self.VALIDATED_CONTRACT, "dtype": torch.float32}
         contracts = (
-            {"device_type": "cpu", "dtype": torch.float32, "device_capability": None},
-            {"device_type": "cuda", "dtype": torch.float16, "device_capability": (12, 0)},
-            {"device_type": "cuda", "dtype": torch.bfloat16, "device_capability": (12, 0)},
-            {"device_type": "cuda", "dtype": torch.float32, "device_capability": (7, 5)},
+            {**validated, "device_type": "cpu"},
+            {**validated, "dtype": torch.float16},
+            {**validated, "dtype": torch.bfloat16},
+            {**validated, "device_name": "NVIDIA L4"},
+            {**validated, "device_capability": (8, 9)},
+            {**validated, "torch_version": "2.12.0+cu128"},
+            {**validated, "matmul_precision": "highest"},
+            {**validated, "allow_tf32": False},
         )
         for contract in contracts:
             with self.subTest(contract=contract):
@@ -128,6 +139,7 @@ class DispatcherExecutionTests(unittest.TestCase):
             device_type="cuda",
             device_index=0,
             dtype=torch.float32,
+            device_name="NVIDIA GeForce RTX 5080",
             device_capability=(12, 0),
             mask_present=mask_present,
             inference_mode=True,
@@ -187,10 +199,16 @@ class DispatcherExecutionTests(unittest.TestCase):
         mask = torch.ones(config.batch_size, config.seq_len, dtype=torch.bool)
         key = self._cuda_runtime_key(x.shape)
         compile_modes = []
+        compiled_calls = []
 
         def fake_compile(function, *, mode):
             compile_modes.append(mode)
-            return function
+
+            def wrapped(*args):
+                compiled_calls.append(True)
+                return function(*args)
+
+            return wrapped
 
         with (
             mock.patch.object(candidate, "_runtime_key", return_value=key),
@@ -202,6 +220,7 @@ class DispatcherExecutionTests(unittest.TestCase):
 
         self.assertTrue(torch.equal(first, second))
         self.assertEqual(compile_modes, ["reduce-overhead"])
+        self.assertEqual(len(compiled_calls), 3)
         self.assertEqual(candidate.last_route.case_id, 2)
         self.assertEqual(len(candidate._compiled_forwards), 1)
 
@@ -236,10 +255,50 @@ class DispatcherExecutionTests(unittest.TestCase):
         self.assertEqual(candidate.last_route.backend, "reference")
         self.assertEqual(len(candidate.compile_failures), 1)
 
+    def test_deferred_compiled_failure_demotes_cached_call(self):
+        config = self._official_config(2)
+        baseline, candidate = self._models(config)
+        x = torch.randn(config.batch_size, config.seq_len, config.d_model)
+        mask = torch.ones(config.batch_size, config.seq_len, dtype=torch.bool)
+        key = self._cuda_runtime_key(x.shape)
+        calls = 0
+
+        def fake_compile(function, *, mode):
+            self.assertEqual(mode, "reduce-overhead")
+
+            def fails_after_warmup(*args):
+                nonlocal calls
+                calls += 1
+                if calls > 2:
+                    raise RuntimeError("synthetic deferred CUDA failure")
+                return function(*args)
+
+            return fails_after_warmup
+
+        with torch.inference_mode():
+            expected = baseline(x, mask)
+        with (
+            mock.patch.object(candidate, "_runtime_key", return_value=key),
+            mock.patch("src.dispatcher.torch.compile", side_effect=fake_compile),
+            torch.inference_mode(),
+        ):
+            candidate(x, mask)
+            actual = candidate(x, mask)
+
+        self.assertTrue(torch.equal(expected, actual))
+        self.assertEqual(candidate.last_route.backend, "reference")
+        self.assertIn("deferred CUDA failure", next(iter(candidate.compile_failures.values())))
+
     def test_parameter_conversion_clears_runtime_cache(self):
+        from src.dispatcher import CachedForward
+
         _, candidate = self._models(self.small_config)
         key = self._cuda_runtime_key((2, 8, 16))
-        candidate._compiled_forwards[key] = candidate._forward_reference
+        candidate._compiled_forwards[key] = CachedForward(
+            candidate._forward_reference,
+            compiled=False,
+            case_id=None,
+        )
         candidate._compile_failures[key] = "synthetic"
         candidate.to(dtype=torch.float64)
         self.assertFalse(candidate._compiled_forwards)

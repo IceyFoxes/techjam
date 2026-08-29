@@ -17,7 +17,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 
 import torch_transformer_benchmark as reference
-from src.infra import CandidateSpec, load_candidate, load_official_cases
+from src.infra import (
+    CandidateSpec,
+    load_candidate,
+    load_official_cases,
+    validate_candidate_execution,
+)
 from src.infra.environment import collect_environment, collect_git, collect_gpu_state
 from src.infra.timing import (
     BASELINE,
@@ -229,6 +234,42 @@ def _timing_summary(samples: List[float]) -> Dict[str, Any]:
     }
 
 
+def _cuda_memory_probe(
+    baseline: torch.nn.Module,
+    candidate: torch.nn.Module,
+    x: torch.Tensor,
+    valid_mask: torch.Tensor,
+    device: torch.device,
+) -> Optional[Dict[str, Dict[str, int]]]:
+    """Record absolute and incremental peaks after lazy compilation is warm."""
+
+    if device.type != "cuda":
+        return None
+
+    snapshots: Dict[str, Dict[str, int]] = {}
+    for label, model in (("baseline", baseline), ("candidate", candidate)):
+        torch.cuda.synchronize(device)
+        torch.cuda.reset_peak_memory_stats(device)
+        before_allocated = torch.cuda.memory_allocated(device)
+        before_reserved = torch.cuda.memory_reserved(device)
+        with torch.inference_mode():
+            output = model(x, valid_mask)
+        torch.cuda.synchronize(device)
+        peak_allocated = torch.cuda.max_memory_allocated(device)
+        peak_reserved = torch.cuda.max_memory_reserved(device)
+        del output
+        torch.cuda.synchronize(device)
+        snapshots[label] = {
+            "before_allocated_bytes": before_allocated,
+            "before_reserved_bytes": before_reserved,
+            "peak_allocated_bytes": peak_allocated,
+            "peak_reserved_bytes": peak_reserved,
+            "incremental_peak_allocated_bytes": peak_allocated - before_allocated,
+            "incremental_peak_reserved_bytes": peak_reserved - before_reserved,
+        }
+    return snapshots
+
+
 def _nvtx_range(device: torch.device, enabled: bool, label: str) -> Any:
     if not enabled or device.type != "cuda":
         return nullcontext()
@@ -340,10 +381,20 @@ def _benchmark(
         input_scale=args.input_scale,
     )
 
+    memory = _cuda_memory_probe(
+        baseline,
+        candidate,
+        x,
+        valid_mask,
+        device,
+    )
+
     if args.timing == "paired":
-        return _paired_benchmark(
+        performance = _paired_benchmark(
             baseline, candidate, config, device, x, valid_mask, args
         )
+        performance["memory"] = memory
+        return performance
 
     reference.warmup_model(baseline, x, valid_mask, args.warmup, device)
     reference.warmup_model(candidate, x, valid_mask, args.warmup, device)
@@ -402,6 +453,7 @@ def _benchmark(
         "candidate": candidate_summary,
         "speedup": speedup,
         "gpu_state": collect_gpu_state(device),
+        "memory": memory,
     }
 
 
@@ -458,6 +510,11 @@ def main() -> int:
     args = parse_args()
     official_case_id = _resolve_shape(args)
     spec = load_candidate(args.candidate)
+    validate_candidate_execution(
+        spec,
+        official_case_id,
+        compile_user=args.compile_user,
+    )
     device, dtype = _configure(args)
     config = reference.TransformerConfig(
         batch_size=args.batch_size,
@@ -500,6 +557,8 @@ def main() -> int:
             "owner": spec.owner,
             "description": spec.description,
             "strict_weight_copy": strict,
+            "self_compiling": spec.self_compiling,
+            "unsupported_official_cases": list(spec.unsupported_official_cases),
         },
         "config": asdict(config),
         "official_case_id": official_case_id,

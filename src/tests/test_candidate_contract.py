@@ -43,6 +43,46 @@ class CandidateContractTests(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "must be a CandidateSpec"):
             load_candidate(module_name)
 
+    def test_rejects_invalid_unsupported_case_metadata(self) -> None:
+        for unsupported in ((0,), (15,), (6, 6), [6]):
+            with self.subTest(unsupported=unsupported):
+                candidate = CandidateSpec(
+                    name="example",
+                    model_factory=lambda config: config,
+                    owner="test",
+                    description="test candidate",
+                    unsupported_official_cases=unsupported,
+                )
+                with self.assertRaises((TypeError, ValueError)):
+                    candidate.validate()
+
+    def test_dispatcher_declares_self_compilation_and_extreme_cases(self) -> None:
+        candidate = load_candidate("src.dispatcher")
+        self.assertTrue(candidate.self_compiling)
+        self.assertEqual(candidate.unsupported_official_cases, (6, 14))
+
+    def test_benchmark_rejects_nested_compilation(self) -> None:
+        from src.infra import validate_candidate_execution
+
+        candidate = load_candidate("src.dispatcher")
+        with self.assertRaisesRegex(ValueError, "compiles itself"):
+            validate_candidate_execution(
+                candidate,
+                official_case_id=1,
+                compile_user=True,
+            )
+
+    def test_benchmark_rejects_extreme_case_before_allocation(self) -> None:
+        from src.infra import validate_candidate_execution
+
+        candidate = load_candidate("src.dispatcher")
+        with self.assertRaisesRegex(ValueError, "before model/input allocation"):
+            validate_candidate_execution(
+                candidate,
+                official_case_id=14,
+                compile_user=False,
+            )
+
 
 class OfficialCasesTests(unittest.TestCase):
     def test_disclosed_table_contains_exactly_fourteen_valid_cases(self) -> None:
@@ -67,6 +107,26 @@ class OfficialCasesTests(unittest.TestCase):
                 "causal": True,
                 "ffn_dim": 1024,
             },
+        )
+
+
+class BenchmarkMemoryTests(unittest.TestCase):
+    def test_cpu_memory_probe_is_explicitly_unavailable(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch is not installed")
+
+        from src.benchmark import _cuda_memory_probe
+
+        self.assertIsNone(
+            _cuda_memory_probe(
+                baseline=object(),
+                candidate=object(),
+                x=torch.empty(0),
+                valid_mask=torch.empty(0, dtype=torch.bool),
+                device=torch.device("cpu"),
+            )
         )
 
 
