@@ -28,6 +28,7 @@ class Route(enum.Enum):
     SDPA_KEYMASK = "sdpa_keymask"
     SDPA_FULLMASK = "sdpa_fullmask"
     EXACT_EAGER = "exact_eager"
+    EXACT_EAGER_PREFIX = "exact_eager_prefix"
 
 
 def select_route(
@@ -49,6 +50,13 @@ def select_route(
         # float16 SDPA fails the pass criterion on 0/8 seeds for case 13. The
         # cause is the reference rounding probabilities to float16 before PV,
         # which a fused kernel does not reproduce. See sdpa-and-precision.md.
+        #
+        # The padding mask may only be skipped when it is provably redundant,
+        # which needs BOTH causal attention and a prefix mask. A general mask
+        # (left padding, interior gaps) still has to be applied, so it gets the
+        # plain exact route. Both are bitwise identical to the reference.
+        if causal and mask_kind is MaskKind.PREFIX:
+            return Route.EXACT_EAGER_PREFIX
         return Route.EXACT_EAGER
 
     if mask_kind is MaskKind.ABSENT:

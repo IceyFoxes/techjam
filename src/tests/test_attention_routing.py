@@ -6,14 +6,35 @@ from src.implementations.attention_routing import MaskKind, Route, select_route
 
 
 class SelectRouteTests(unittest.TestCase):
-    def test_non_float32_always_takes_the_exact_eager_route(self) -> None:
+    EXACT_ROUTES = (Route.EXACT_EAGER, Route.EXACT_EAGER_PREFIX)
+
+    def test_non_float32_always_takes_an_exact_route(self) -> None:
         for causal in (True, False):
             for kind in MaskKind:
-                self.assertIs(
+                self.assertIn(
                     select_route(False, causal, kind),
-                    Route.EXACT_EAGER,
+                    self.EXACT_ROUTES,
                     msg=f"causal={causal} kind={kind}",
                 )
+
+    def test_non_float32_skips_the_padding_mask_only_when_provably_redundant(
+        self,
+    ) -> None:
+        # Redundant only under causal attention with a prefix mask.
+        self.assertIs(
+            select_route(False, True, MaskKind.PREFIX), Route.EXACT_EAGER_PREFIX
+        )
+        # A general mask must still be applied, even under causal attention.
+        self.assertIs(
+            select_route(False, True, MaskKind.GENERAL), Route.EXACT_EAGER
+        )
+        # Without causal there is no upper triangle to subsume the padding.
+        self.assertIs(
+            select_route(False, False, MaskKind.PREFIX), Route.EXACT_EAGER
+        )
+        self.assertIs(
+            select_route(False, False, MaskKind.GENERAL), Route.EXACT_EAGER
+        )
 
     def test_absent_mask_uses_plain_causal_sdpa(self) -> None:
         self.assertIs(select_route(True, True, MaskKind.ABSENT), Route.SDPA_CAUSAL)
