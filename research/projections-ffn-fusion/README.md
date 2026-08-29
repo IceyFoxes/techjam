@@ -22,8 +22,14 @@ is the executable definition of the required computation and correctness behavio
   and implementation kill criteria.
 - [Packed QKV layout contract](qkv-layout.md): stride analysis, attention
   compatibility, and the shared Person 2/Person 3 interface.
+- [Feasibility gate: Case #14 memory analysis](feasibility-gate.md): exact memory
+  calculations proving the baseline cannot execute Case #14 on any single GPU.
 
 ## Current Status
+
+**BLOCKER (29 Aug 2026):** Case #14 baseline is infeasible. The score tensor
+[B,H,S,S] = [32,16,100K,100K] requires 9.31 TiB in FP16, which exceeds any
+single GPU by >93×. This is a task-level issue, not an optimization target.
 
 Broad reconnaissance and focused source validation were completed on 29 August
 2026 across packed QKV, FFN epilogues, residual-LayerNorm fusion, layouts,
