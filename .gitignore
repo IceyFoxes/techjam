@@ -10,6 +10,9 @@ venv/
 build/
 dist/
 
+# Personal role marker (git-ignored; see MY_ROLE.md)
+MY_ROLE.md
+
 # Local and generated artifacts
 artifacts/profiles/
 *.log
