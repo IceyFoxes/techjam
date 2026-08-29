@@ -5,6 +5,10 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-29-rtx5080-f945daf/`](2026-08-29-rtx5080-f945daf/README.md): merged
+  Case-2 packed-QKV checkpoint; PASS 5/5 at 6.191x versus the immutable baseline,
+  plus a same-process diagnostic showing a 1.234x incremental gain over the
+  prior three-projection compiled route.
 - [`2026-08-29-rtx5080-307eedb/`](2026-08-29-rtx5080-307eedb/README.md): final
   hardened dispatcher evidence for all twelve supported cases on the RTX 5080;
   PASS 5/5 on every case, 3.548x geometric mean, and CUDA peak-memory records.
