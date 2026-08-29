@@ -122,11 +122,28 @@ Adds a parallelization axis by splitting keys/values into chunks, attending to
 each in parallel, storing one log-sum-exp scalar per row per split, then reducing
 across splits using those scalars. Reports up to 8x for long-context decoding.
 
-**Applies: partially.** The 8x headline is for autoregressive decode (query length
-1), which we do not have. But the *mechanism* — recovering parallelism when
-batch x heads alone underfills the GPU — is relevant to our low-occupancy cases:
-case 9 has H=1 and case 2 has B=1. The log-sum-exp rescaled reduction is also the
-correct way to combine partial softmax results in any custom kernel.
+**Applies: no — measured, only one case is occupancy-starved and it is
+launch-bound anyway.** The 8x headline is for autoregressive decode (query
+length 1), which we do not have. The transferable mechanism is recovering
+parallelism when `batch x heads` underfills the GPU, so the question is which of
+our cases are starved. Against the measured 24 SMs:
+
+| Case | B | H | `B*H` | vs 24 SMs | verdict |
+| --- | --- | --- | --- | --- | --- |
+| 2 | 1 | 4 | 4 | 0.2x | **starved** |
+| 3 | 4 | 4 | 16 | 0.7x | marginal |
+| 9 | 64 | 1 | 64 | 2.7x | fine |
+| 4 | 16 | 4 | 64 | 2.7x | fine |
+| all others | | | 128-1024 | 5.3-42.7x | fine |
+
+An earlier draft of this document guessed that case 9 (H=1) would be starved.
+It is not: `H=1` is offset by `B=64`. Only case 2 is genuinely starved, and case 2
+is also the launch-bound one — its GPU sits at 11-20% utilization drawing 12 W of
+a 70 W budget, so the constraint there is CPU dispatch, not GPU parallelism.
+Split-K would add launches to a case already limited by launches.
+
+The log-sum-exp rescaled reduction remains the correct way to combine partial
+softmax results if we ever write a custom kernel.
 
 ### A7. CUTLASS/CuTe fused attention implementations
 
@@ -229,13 +246,11 @@ SDPA.** The remaining opportunities are at the boundaries.
    — the `.contiguous()` in `_split_heads` and the context transpose. This is now
    the largest remaining attention-adjacent cost, and Ivanov et al.'s layout-search
    methodology applies directly. Requires negotiating the stage 2/8 boundary.
-2. **Split-K style parallelization (A6)** for low-occupancy shapes — case 9 (H=1)
-   and case 2 (B=1), where `batch x heads` cannot fill the GPU. Whether SDPA
-   already does this is unmeasured and is the obvious next experiment.
-3. **Accept that cases 2, 3, 12 are launch-bound (B1)** and out of Person 2's
+2. **Accept that cases 2, 3, 12 are launch-bound (B1)** and out of Person 2's
    reach. They need CUDA graphs or compilation, which is Person 1's scope.
-4. **Nothing from Tier C**, and — now measured — **nothing from FlexAttention**
-   for plain causal masking.
+3. **Nothing from Tier C**; **nothing from FlexAttention** for plain causal
+   masking; and **nothing from split-K (A6)** — occupancy analysis shows only
+   case 2 is starved, and it is launch-bound rather than parallelism-bound.
 
 ### What this means for a custom Triton kernel
 

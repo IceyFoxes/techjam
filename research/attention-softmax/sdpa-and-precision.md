@@ -157,8 +157,10 @@ dominating enough for tensor-core throughput to outweigh the cast overhead.
 
 1. **Target float32.** It is the harness default and the only dtype where fused
    attention provably passes.
-2. **Use SDPA (memory-efficient backend) for lever L1**, not a hand-written
-   kernel, until profiling shows a specific gap.
+2. **Use SDPA (memory-efficient backend) for lever L1** on every in-scope case,
+   not a hand-written kernel. The full sweep in
+   [`measurements.md`](measurements.md) shows all twelve cases passing and all
+   twelve gaining, geometric mean ≈1.94x.
 3. **Apply the bitwise-exact levers (L6, L7) everywhere**, including shapes where
    SDPA is not profitable, because they cannot affect correctness in any dtype.
 4. **Do not pursue float16 internals (L8).** Measured slower than plain float32
