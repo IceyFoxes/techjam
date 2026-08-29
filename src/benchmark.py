@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import shlex
+import statistics
 import sys
 from contextlib import nullcontext
 from dataclasses import asdict
@@ -17,7 +18,18 @@ import torch
 
 import torch_transformer_benchmark as reference
 from src.infra import CandidateSpec, load_candidate, load_official_cases
-from src.infra.environment import collect_environment, collect_git
+from src.infra.environment import collect_environment, collect_git, collect_gpu_state
+from src.infra.timing import (
+    BASELINE,
+    CANDIDATE,
+    choose_block_size,
+    is_significant,
+    make_block_runner,
+    measure_pair,
+    noise_floor_ratio,
+    paired_summary,
+    settle,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,6 +79,37 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--repeats", type=int, default=100)
     parser.add_argument("--benchmark-rounds", type=int, default=3)
+    parser.add_argument(
+        "--timing",
+        choices=("paired", "legacy"),
+        default="paired",
+        help=(
+            "paired interleaves both models sample by sample so boost-clock "
+            "drift cannot favour either; legacy reproduces the original "
+            "block-per-round schedule for comparison only"
+        ),
+    )
+    parser.add_argument(
+        "--settle-seconds",
+        type=float,
+        default=10.0,
+        help=(
+            "hold the device under load before timing so its clocks reach a "
+            "steady state; 0 disables and reports boost-window latency"
+        ),
+    )
+    parser.add_argument(
+        "--block-size",
+        type=int,
+        default=0,
+        help="forward passes per timed sample; 0 selects it from a probe",
+    )
+    parser.add_argument(
+        "--sample-target-ms",
+        type=float,
+        default=50.0,
+        help="duration each timed sample should cover when block size is automatic",
+    )
     parser.add_argument("--benchmark-on-failure", action="store_true")
     parser.add_argument(
         "--nvtx",
@@ -192,6 +235,94 @@ def _nvtx_range(device: torch.device, enabled: bool, label: str) -> Any:
     return torch.cuda.nvtx.range(label)
 
 
+def _resolve_block_size(
+    model: torch.nn.Module,
+    x: torch.Tensor,
+    valid_mask: torch.Tensor,
+    device: torch.device,
+    args: argparse.Namespace,
+) -> int:
+    if args.block_size > 0:
+        return args.block_size
+
+    probe_runner = make_block_runner(model, x, valid_mask, device, block_size=1)
+    probe = measure_pair(
+        {BASELINE: probe_runner, CANDIDATE: probe_runner}, repeats=2, device=device
+    )
+    per_iteration_ms = statistics.median(probe[BASELINE] + probe[CANDIDATE])
+    return choose_block_size(per_iteration_ms, target_ms=args.sample_target_ms)
+
+
+def _paired_benchmark(
+    baseline: torch.nn.Module,
+    candidate: torch.nn.Module,
+    config: reference.TransformerConfig,
+    device: torch.device,
+    x: torch.Tensor,
+    valid_mask: torch.Tensor,
+    args: argparse.Namespace,
+) -> Dict[str, Any]:
+    """Time both models under identical clock conditions and judge significance."""
+    with torch.inference_mode():
+        settle(baseline, x, valid_mask, device, args.settle_seconds)
+        settle(candidate, x, valid_mask, device, args.settle_seconds)
+
+    block_size = _resolve_block_size(baseline, x, valid_mask, device, args)
+    runners = {
+        BASELINE: make_block_runner(baseline, x, valid_mask, device, block_size),
+        CANDIDATE: make_block_runner(candidate, x, valid_mask, device, block_size),
+    }
+
+    with _nvtx_range(device, args.nvtx, "paired_timing"):
+        samples = measure_pair(runners, args.repeats, device=device)
+
+    summary = paired_summary(samples)
+    noise_floor = noise_floor_ratio(samples)
+    significant = is_significant(summary["speedup"], noise_floor)
+
+    baseline_summary = _timing_summary(samples[BASELINE])
+    candidate_summary = _timing_summary(samples[CANDIDATE])
+    tokens = config.batch_size * config.seq_len
+    baseline_summary["tokens_per_second"] = (
+        tokens * 1000.0 / baseline_summary["median_ms"]
+    )
+    candidate_summary["tokens_per_second"] = (
+        tokens * 1000.0 / candidate_summary["median_ms"]
+    )
+
+    verdict = "SIGNIFICANT" if significant else "WITHIN NOISE"
+    print(
+        f"baseline median={baseline_summary['median_ms']:.4f} ms | "
+        f"candidate median={candidate_summary['median_ms']:.4f} ms | "
+        f"speedup={summary['speedup']:.3f}x"
+    )
+    print(
+        f"noise floor=+/-{noise_floor * 100:.2f}% | {verdict} | "
+        f"block={block_size} repeats={args.repeats} settle={args.settle_seconds:g}s"
+    )
+    if not significant:
+        print(
+            "  this difference cannot be distinguished from measurement noise; "
+            "raise --repeats or treat it as no change"
+        )
+
+    return {
+        "timing_mode": "paired",
+        "settle_seconds": args.settle_seconds,
+        "block_size": block_size,
+        "repeats": args.repeats,
+        "timing_method": (
+            "torch.cuda.Event" if device.type == "cuda" else "perf_counter_ns"
+        ),
+        "baseline": baseline_summary,
+        "candidate": candidate_summary,
+        "speedup": summary["speedup"],
+        "noise_floor_ratio": noise_floor,
+        "significant": significant,
+        "gpu_state": collect_gpu_state(device),
+    }
+
+
 def _benchmark(
     baseline: torch.nn.Module,
     candidate: torch.nn.Module,
@@ -208,6 +339,12 @@ def _benchmark(
         padding_ratio=args.padding_ratio,
         input_scale=args.input_scale,
     )
+
+    if args.timing == "paired":
+        return _paired_benchmark(
+            baseline, candidate, config, device, x, valid_mask, args
+        )
+
     reference.warmup_model(baseline, x, valid_mask, args.warmup, device)
     reference.warmup_model(candidate, x, valid_mask, args.warmup, device)
 
@@ -254,6 +391,7 @@ def _benchmark(
         f"speedup={speedup:.3f}x"
     )
     return {
+        "timing_mode": "legacy",
         "warmup_iterations": args.warmup,
         "repeats": args.repeats,
         "rounds": args.benchmark_rounds,
@@ -263,6 +401,7 @@ def _benchmark(
         "baseline": baseline_summary,
         "candidate": candidate_summary,
         "speedup": speedup,
+        "gpu_state": collect_gpu_state(device),
     }
 
 
