@@ -70,3 +70,11 @@ approximately 1.19x compiled ratios with zero failures over the 60-trial stress
 matrix. This is exploratory implementation-selection evidence, not an accepted
 benchmark result, because the timing interval remains statistically invalid and
 the validated dispatcher environment is the RTX 5080.
+
+An RTX 5080 follow-up on 29 August 2026 adds hardware-specific contrary evidence
+for Case #3 without changing the historical RTX 4050 conclusion. The
+[`12a37c6 three-reference validation`](../benchmarks/2026-08-29-rtx5080-12a37c6/README.md)
+measures packed QKV at 1.192x over the existing compiled Case-3 route with a
+±0.84% direct paired noise floor, PASS 60/60 stress trials, and bitwise identity
+to the strided control. Universal packing remains rejected; only Case #3 should
+advance to an RTX-5080-specific dispatcher integration checkpoint.

@@ -1,0 +1,268 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.0,
+    "max_relative_error": 0.0,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 5242880,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0,
+        "max_relative_error": 0.0,
+        "mean_abs_error": 0.0,
+        "optimized_at_worst": -0.3902844190597534,
+        "passed": true,
+        "reference_at_worst": -0.3902844190597534,
+        "seed": 1234,
+        "total_elements": 1048576,
+        "trial": 1,
+        "worst_index": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0,
+        "max_relative_error": 0.0,
+        "mean_abs_error": 0.0,
+        "optimized_at_worst": 0.2406592071056366,
+        "passed": true,
+        "reference_at_worst": 0.2406592071056366,
+        "seed": 1235,
+        "total_elements": 1048576,
+        "trial": 2,
+        "worst_index": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0,
+        "max_relative_error": 0.0,
+        "mean_abs_error": 0.0,
+        "optimized_at_worst": 0.141535684466362,
+        "passed": true,
+        "reference_at_worst": 0.141535684466362,
+        "seed": 1236,
+        "total_elements": 1048576,
+        "trial": 3,
+        "worst_index": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0,
+        "max_relative_error": 0.0,
+        "mean_abs_error": 0.0,
+        "optimized_at_worst": -0.6389197111129761,
+        "passed": true,
+        "reference_at_worst": -0.6389197111129761,
+        "seed": 1237,
+        "total_elements": 1048576,
+        "trial": 4,
+        "worst_index": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0,
+        "max_relative_error": 0.0,
+        "mean_abs_error": 0.0,
+        "optimized_at_worst": 0.7055597305297852,
+        "passed": true,
+        "reference_at_worst": 0.7055597305297852,
+        "seed": 1238,
+        "total_elements": 1048576,
+        "trial": 5,
+        "worst_index": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "description": "Known-correct baseline used to smoke-test candidate loading.",
+    "name": "reference",
+    "owner": "infrastructure",
+    "selector": "reference",
+    "self_compiling": false,
+    "strict_weight_copy": true,
+    "unsupported_official_cases": []
+  },
+  "command": "/home/kevin/techjam/.venv/bin/python /tmp/techjam-base-bdf404f/src/benchmark.py --candidate reference --case 11 --device cuda --dtype float32 --accuracy-trials 5 --seed 1234 --repeats 30 --settle-seconds 3 --sample-target-ms 50 --output /tmp/techjam-packed-cross-case-12a37c6-3s/baseline-case11.json",
+  "config": {
+    "batch_size": 64,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 16,
+    "num_layers": 4,
+    "seq_len": 128
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665912778752,
+      "path": "/tmp/techjam-base-bdf404f",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "bdf404f0a50fda387f63a052044b41d2c47a68b6",
+    "dirty": false,
+    "status": ""
+  },
+  "input_scale": 1.0,
+  "nvtx_enabled": false,
+  "official_case_id": 11,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.0,
+  "performance": {
+    "baseline": {
+      "mean_ms": 5.9030710856119795,
+      "median_ms": 5.621447033352322,
+      "min_ms": 5.360256195068359,
+      "p90_ms": 6.664396794637045,
+      "samples_ms": [
+        5.360256195068359,
+        5.532728830973308,
+        5.677912818060981,
+        5.814104715983073,
+        5.511342366536458,
+        5.367299397786458,
+        5.485514746771918,
+        5.504856957329644,
+        5.520266638861762,
+        5.388007269965278,
+        5.389031304253472,
+        5.647875467936198,
+        5.460597144232856,
+        5.595018598768446,
+        5.420270284016927,
+        5.962243398030599,
+        6.128473069932726,
+        7.325870090060764,
+        7.256124708387587,
+        6.809888203938802,
+        6.6190185546875,
+        6.569176991780599,
+        6.648231082492405,
+        6.624088711208767,
+        5.677571614583333,
+        5.5509228176540795,
+        6.116881900363499,
+        5.571417066786024,
+        5.489155663384332,
+        6.06798595852322
+      ],
+      "tokens_per_second": 1457276.027221543
+    },
+    "block_size": 9,
+    "candidate": {
+      "mean_ms": 5.94878412882487,
+      "median_ms": 5.63622940911187,
+      "min_ms": 5.376629299587673,
+      "p90_ms": 6.806838777330187,
+      "samples_ms": [
+        5.380049811469184,
+        5.4867663913302955,
+        6.891352759467231,
+        6.806588490804036,
+        5.439207288953993,
+        5.6128285725911455,
+        5.376629299587673,
+        5.420433892144097,
+        5.575918409559462,
+        5.4616211785210504,
+        5.541493309868707,
+        5.4146313137478295,
+        5.538080003526476,
+        5.415765126546224,
+        5.659630245632595,
+        5.504252539740668,
+        6.174488915337457,
+        6.251530541314019,
+        7.1314239501953125,
+        6.538072797987196,
+        6.680412292480469,
+        6.762798309326172,
+        6.6204833984375,
+        6.809091356065538,
+        5.469244639078776,
+        5.436362796359592,
+        6.289126925998264,
+        6.250328911675347,
+        5.681212531195746,
+        5.843697865804036
+      ],
+      "tokens_per_second": 1453453.9681362715
+    },
+    "gpu_state": {
+      "clocks.mem": "15001",
+      "clocks.sm": "2842",
+      "clocks_throttle_reasons.active": "0x0000000000000400",
+      "power.draw": "206.48",
+      "power.limit": "360.00",
+      "temperature.gpu": "57"
+    },
+    "memory": {
+      "baseline": {
+        "before_allocated_bytes": 40945664,
+        "before_reserved_bytes": 241172480,
+        "incremental_peak_allocated_bytes": 167804928,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 208750592,
+        "peak_reserved_bytes": 241172480
+      },
+      "candidate": {
+        "before_allocated_bytes": 40945664,
+        "before_reserved_bytes": 241172480,
+        "incremental_peak_allocated_bytes": 167804928,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 208750592,
+        "peak_reserved_bytes": 241172480
+      }
+    },
+    "noise_floor_ratio": 0.02853249607328508,
+    "repeats": 30,
+    "settle_seconds": 3.0,
+    "significant": false,
+    "speedup": 0.997377257970435,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "paired"
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-29T13:45:24.686569+00:00"
+}
