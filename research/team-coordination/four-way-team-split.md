@@ -182,3 +182,25 @@ The dispatcher must route on the complete known tuple:
 ```
 
 Keep all shape checks centralized in `src/dispatcher.py` rather than scattering them through kernels.
+
+## Review Handoff: 29 August 2026
+
+These acceptance criteria record the team decision following review; they do not
+replace each owner's implementation research.
+
+- **Person 1:** initially promote only the nine integrated FP32 routes for cases
+  1, 3-5, 7, and 9-12. Require the preserved RTX 5080 software, hardware, and
+  numerical contract rather than CUDA capability `>= 8.0`; reproduce cases 2,
+  8, and 13 through the exact dispatcher before promotion. Prevent external
+  `--compile-user` wrapping of self-compiling candidates and protect cached calls
+  from recompilation or deferred CUDA failures.
+- **Person 2:** reconcile the stale Case #8 SDPA prohibition with the later
+  whole-model correction, and qualify the root claim that FP16 fails under every
+  reassociation. New routes require integrated evidence across seeds, padding,
+  and input scales.
+- **Person 4:** cases 6 and 14 remain explicitly unsupported until memory-safe
+  routes exist. Integration must fail before dense baseline, candidate, compile,
+  or timing allocation rather than label the dense reference path memory-safe.
+- **Person 3:** keep the functional-FFN implementation as a rejected control and
+  pursue only an end-to-end packed-QKV/layout experiment against the current
+  SDPA plus strided-view route, with Case #8 as the primary target.

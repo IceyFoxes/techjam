@@ -14,6 +14,18 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Invalid, Stale, or Superseded Runs
 
+- 29 August 2026: [`2026-08-29-rtx4050-optimization-wave1.md`](2026-08-29-rtx4050-optimization-wave1.md)
+  is **stale exploratory evidence**. It predates the paired, settled timing
+  correction and omits exact commands, timestamps, dtype, raw samples, timing
+  parameters, and the complete software and hardware environment. The
+  experimental implementations are also not present at its attributed
+  `f4546f4` revision. Its `20.75x` compiler result is therefore not an accepted
+  breakthrough or routing result, and its `1.126x` padded-mask result cannot be
+  attributed to an all-true-mask elimination because padded masks contain
+  invalid positions. The same record's `0.967x` unpadded result does not support
+  a claim of zero cost. Preserve the leaf as history; use the paired RTX 5080
+  records below as contrary methodological evidence, not as same-machine
+  numerical replacements.
 - 29 August 2026: case 8 float32 `max-autotune` is **invalid for performance
   comparison** because correctness failed on all five trials. Use the valid
   [`reduce-overhead` result](2026-08-29-rtx5080-6bde871/case8-fp32-reduce-overhead.json)
