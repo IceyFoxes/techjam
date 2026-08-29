@@ -22,6 +22,34 @@ Status: current as of 29 August 2026.
 This deviates from the team's pinned `requirements.txt` (torch 2.13.0+cu130,
 numpy 2.5.2), which needs Python 3.12 and could not be installed on this host.
 
+**Corrected 30 August 2026 — it can now be installed on this host.** Two
+obstacles were removed:
+
+1. *Driver.* CUDA 13.x requires driver >= 580; this host was on 566.26
+   (CUDA 12.7). Updating the **Windows** driver to 616.56 raised it to CUDA UMD
+   13.4 — the same driver Person 1's RTX 5080 runs, so both machines are now on
+   identical driver/CUDA stacks. On WSL2 the driver comes from Windows and
+   cannot be changed from inside Linux.
+2. *Python.* `numpy==2.5.2` requires Python >= 3.12, and this host has only 3.10
+   (plus asdf 3.11.9), with no `python3-venv` package and no sudo. Rather than
+   compile 3.12, `uv` fetched a prebuilt standalone CPython 3.12.14 in ~17 s
+   with no root. `python3 -m venv --without-pip` plus PyPA's `get-pip.py`
+   remains necessary for any 3.10 venv here.
+
+The pinned stack now lives in `.venv-cu130` (git-ignored): Python 3.12.14,
+torch 2.13.0+cu130, triton 3.7.1, CUDA runtime 13.0. `src/tests` passes 62/62 on
+it, and `src.dispatcher` now selects `compiled-sdpa` for the eligible official
+cases instead of falling back to reference arithmetic.
+
+**`.venv` (Python 3.10, torch 2.6.0+cu124) is deliberately retained.** Every
+measurement in this document was taken on it, and paired-timing ratios are only
+comparable within a single build. Any figure re-measured on `.venv-cu130` is a
+separate run and must not be compared against the numbers below.
+
+One caution for re-measurement: `uv pip install` failed the first time with a
+network timeout during extraction. Use `UV_HTTP_TIMEOUT=600` and
+`UV_CONCURRENT_DOWNLOADS=4`.
+
 **Timing method.** All speedups use the paired timing mode added in
 [`src/infra/timing.py`](../../src/infra/timing.py): both models are interleaved
 sample by sample so boost-clock drift cannot favour either, and every result
