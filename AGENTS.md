@@ -13,7 +13,7 @@
 - Research is non-destructive. Do not delete or overwrite a research file because its conclusions may be outdated. Mark it `superseded`, `stale`, or `disputed` in the nearest index, with the date, reason, and a link to the replacement or contrary evidence.
 - When an official clarification changes the task, preserve the previous wording in `TASK.md`, label its status, and add the new dated wording and source.
 - For every public source, include its URL, access date, and a concise summary of the details relevant to this task. For source code, also identify the repository revision and relevant file or symbol when available.
-- Before research work, run `git switch master` and `git pull --rebase origin master`. Commit focused research checkpoints and `git push origin master` frequently. If a push is rejected, pull with rebase and preserve both contributors' work when resolving conflicts.
+- Before research work or rebasing, run `git switch master` and `git fetch origin master`, then read incoming commit messages with `git log --oneline HEAD..origin/master`. Decide whether they affect the current task; inspect relevant commits and investigate their impact before continuing, otherwise proceed with `git rebase origin/master`. Commit focused research checkpoints and `git push origin master` frequently. If a push is rejected, repeat this review-and-rebase workflow and preserve both contributors' work when resolving conflicts.
 - Never force-push `master` or discard another contributor's changes.
 
 ## Code Changes
