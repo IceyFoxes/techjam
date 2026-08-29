@@ -13,6 +13,10 @@ dist/
 # Personal role marker (git-ignored; see MY_ROLE.md)
 MY_ROLE.md
 
+# Local developer environment (direnv, editor)
+.envrc
+.vscode/
+
 # Local and generated artifacts
 artifacts/profiles/
 *.log
