@@ -88,6 +88,30 @@ The harness refuses to benchmark a numerically incorrect candidate unless
 `--compile-mode`, masking, causal mode, TF32, tolerances, warmup, and repeat flags
 match the root benchmark's behavior and defaults.
 
+### Smart dispatcher
+
+The integrated selector is `src.dispatcher`. It lazily compiles its own callable
+after the harness moves weights to their final device and dtype, so do **not**
+also pass `--compile-user`:
+
+```bash
+.venv/bin/python -m src.benchmark \
+  --candidate src.dispatcher --case 2 --device cuda --dtype float32
+```
+
+For float32 CUDA devices with compute capability 8.0 or newer, official cases
+1-5, 7-12 use strided-view SDPA inside `reduce-overhead`; case 13 uses the same
+SDPA path with ordinary/default compilation. The complete official tuple is
+matched before selecting a route. Cases 6 and 14, non-float32 inputs, CPU,
+older/unknown CUDA devices, non-official configurations, mismatched runtime
+shapes, unavailable compilation, and first-call compiler failures use the exact
+reference arithmetic. Compiled callables are cached per model instance and
+invalidated if parameters are loaded, moved, or converted.
+
+Case 8 currently retains the reference projection/FFN layout around SDPA. Its
+planned packed-QKV specialization remains a separate integration step because
+the Person 3 implementation is not yet available.
+
 ### End-to-end dummy check
 
 The `dummy` candidate runs the exact reference path, then performs a bounded and
