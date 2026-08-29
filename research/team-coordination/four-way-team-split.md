@@ -204,3 +204,12 @@ replace each owner's implementation research.
 - **Person 3:** keep the functional-FFN implementation as a rejected control and
   pursue only an end-to-end packed-QKV/layout experiment against the current
   SDPA plus strided-view route, with Case #8 as the primary target.
+
+### Person 1 resolution
+
+The hardened dispatcher at `307eedb` resolves the Person 1 review items: exact
+dispatcher records now cover cases 2, 8, and 13; optimized routing requires the
+preserved RTX 5080/PyTorch/numerical contract; self-compiling metadata prevents
+external `--compile-user` wrapping; compilation plus replay is completed before
+caching; cached failures demote safely; and cases 6/14 fail before allocation.
+All twelve supported cases pass 5/5 seeds with a 3.548x geometric mean.

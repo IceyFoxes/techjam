@@ -1,0 +1,291 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.0011283159255981445,
+    "max_relative_error": 2846.05419921875,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 1310720,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0009923577308654785,
+        "max_relative_error": 2846.05419921875,
+        "mean_abs_error": 0.00011242211621720344,
+        "optimized_at_worst": -0.7559657692909241,
+        "passed": true,
+        "reference_at_worst": -0.7549734115600586,
+        "seed": 1234,
+        "total_elements": 262144,
+        "trial": 1,
+        "worst_index": [
+          35,
+          1,
+          92
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.00090789794921875,
+        "max_relative_error": 29.687332153320312,
+        "mean_abs_error": 0.00011327638640068471,
+        "optimized_at_worst": -0.9997235536575317,
+        "passed": true,
+        "reference_at_worst": -1.0006314516067505,
+        "seed": 1235,
+        "total_elements": 262144,
+        "trial": 2,
+        "worst_index": [
+          8,
+          1,
+          5
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0011283159255981445,
+        "max_relative_error": 8.833623886108398,
+        "mean_abs_error": 0.0001128282310673967,
+        "optimized_at_worst": -1.5041249990463257,
+        "passed": true,
+        "reference_at_worst": -1.5052533149719238,
+        "seed": 1236,
+        "total_elements": 262144,
+        "trial": 3,
+        "worst_index": [
+          55,
+          1,
+          124
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0009726285934448242,
+        "max_relative_error": 10.645218849182129,
+        "mean_abs_error": 0.00011255186109337956,
+        "optimized_at_worst": -0.9225625991821289,
+        "passed": true,
+        "reference_at_worst": -0.9235352277755737,
+        "seed": 1237,
+        "total_elements": 262144,
+        "trial": 4,
+        "worst_index": [
+          26,
+          1,
+          113
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0008745789527893066,
+        "max_relative_error": 10.819313049316406,
+        "mean_abs_error": 0.00011300466576358303,
+        "optimized_at_worst": -0.6281455159187317,
+        "passed": true,
+        "reference_at_worst": -0.6272709369659424,
+        "seed": 1238,
+        "total_elements": 262144,
+        "trial": 5,
+        "worst_index": [
+          12,
+          1,
+          47
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "description": "Lazy twelve-case float32 CUDA dispatcher: strided-view SDPA with shape-specific compile modes and an exact reference fallback.",
+    "name": "dispatcher",
+    "owner": "Person 1 / integrator",
+    "selector": "src.dispatcher",
+    "self_compiling": true,
+    "strict_weight_copy": true,
+    "unsupported_official_cases": [
+      6,
+      14
+    ]
+  },
+  "command": "/home/kevin/techjam/.venv/bin/python /home/kevin/techjam/src/benchmark.py --candidate src.dispatcher --case 12 --device cuda --dtype float32 --accuracy-trials 5 --repeats 40 --settle-seconds 10 --sample-target-ms 50 --output research/benchmarks/2026-08-29-rtx5080-307eedb/case12-fp32-dispatcher.json",
+  "config": {
+    "batch_size": 64,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 4,
+    "num_layers": 4,
+    "seq_len": 32
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665937453056,
+      "path": "/home/kevin/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "307eedb2777c483befe7eadaecf1a7a9f5aff6be",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-29-rtx5080-307eedb/"
+  },
+  "input_scale": 1.0,
+  "nvtx_enabled": false,
+  "official_case_id": 12,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.0,
+  "performance": {
+    "baseline": {
+      "mean_ms": 0.9022079626719156,
+      "median_ms": 0.7666033506393433,
+      "min_ms": 0.7423046429951986,
+      "p90_ms": 1.3592476367950441,
+      "samples_ms": [
+        0.8297373453776041,
+        0.7796379725138346,
+        0.7669233481089274,
+        0.7571313381195068,
+        0.7688220342000326,
+        0.747347354888916,
+        0.7662833531697592,
+        0.7610353628794352,
+        0.7635313669840494,
+        0.761056661605835,
+        0.7588593165079752,
+        0.7501553694407145,
+        1.8421233495076497,
+        0.7426886558532715,
+        0.7423046429951986,
+        1.2073079744974773,
+        1.3557233810424805,
+        1.400373935699463,
+        0.8459839820861816,
+        0.7508379618326823,
+        0.7736860116322836,
+        0.773664633433024,
+        0.7578779856363932,
+        0.7601606845855713,
+        0.7497499783833822,
+        0.7592433293660482,
+        0.7637659708658854,
+        0.786785364151001,
+        1.1524793306986492,
+        0.83624267578125,
+        0.752480665842692,
+        0.7512006759643555,
+        0.757835308710734,
+        0.7753073374430338,
+        0.7508619626363119,
+        1.3909659385681152,
+        1.3505606651306152,
+        1.1322139898935955,
+        0.7991366386413574,
+        1.4162346522013347
+      ],
+      "tokens_per_second": 2671524.9787154966
+    },
+    "block_size": 48,
+    "candidate": {
+      "mean_ms": 0.18190426876147586,
+      "median_ms": 0.1798306703567505,
+      "min_ms": 0.1738439997037252,
+      "p90_ms": 0.1899221996466319,
+      "samples_ms": [
+        0.17742933829625449,
+        0.2298686703046163,
+        0.1743779977162679,
+        0.17862667640050253,
+        0.18057066202163696,
+        0.1796813408533732,
+        0.18700667222340903,
+        0.18184800942738852,
+        0.1788360079129537,
+        0.18291733662287393,
+        0.17995800574620566,
+        0.19320599238077799,
+        0.17980732520421347,
+        0.18955733378728232,
+        0.17478267351786295,
+        0.1800346573193868,
+        0.1738439997037252,
+        0.17868934075037637,
+        0.18039333820343018,
+        0.17900466918945312,
+        0.18021533886591592,
+        0.18174866835276285,
+        0.18017999331156412,
+        0.17398200432459512,
+        0.1773126721382141,
+        0.20204933484395346,
+        0.17427066961924234,
+        0.17982200781504312,
+        0.17414265871047974,
+        0.19399333000183105,
+        0.17444133758544922,
+        0.17962400118509927,
+        0.18733000755310059,
+        0.17983933289845785,
+        0.1805526614189148,
+        0.1808966596921285,
+        0.18312400579452515,
+        0.17965000867843628,
+        0.17394200960795084,
+        0.17861400047938028
+      ],
+      "tokens_per_second": 11388491.161919989
+    },
+    "gpu_state": {
+      "clocks.mem": "15001",
+      "clocks.sm": "2835",
+      "clocks_throttle_reasons.active": "0x0000000000000400",
+      "power.draw": "114.28",
+      "power.limit": "360.00",
+      "temperature.gpu": "52"
+    },
+    "memory": {
+      "baseline": {
+        "before_allocated_bytes": 37795840,
+        "before_reserved_bytes": 113246208,
+        "incremental_peak_allocated_bytes": 10490880,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 48286720,
+        "peak_reserved_bytes": 113246208
+      },
+      "candidate": {
+        "before_allocated_bytes": 37795840,
+        "before_reserved_bytes": 113246208,
+        "incremental_peak_allocated_bytes": 34603008,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 72398848,
+        "peak_reserved_bytes": 113246208
+      }
+    },
+    "noise_floor_ratio": 0.5993551871133005,
+    "repeats": 40,
+    "settle_seconds": 10.0,
+    "significant": true,
+    "speedup": 4.262917716530475,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "paired"
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-29T12:27:36.917661+00:00"
+}
