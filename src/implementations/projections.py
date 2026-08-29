@@ -1,4 +1,4 @@
-"""Person 3 reference-equivalent control using functional FFN operators."""
+"""Person 3 projection controls and the experimental Case-2 packed-QKV route."""
 
 import torch
 import torch.nn as nn
@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 from torch_transformer_benchmark import BaselineTransformer, BaselineTransformerBlock
 
+from src.dispatcher import StridedSDPASelfAttention
 from src.infra import CandidateSpec
 
 
@@ -53,6 +54,98 @@ class ProjectionsControl(BaselineTransformer):
         self.layers = functional_layers
 
 
+class PackedQKVSDPASelfAttention(StridedSDPASelfAttention):
+    """Inference-only packed QKV projection feeding copy-free SDPA views."""
+
+    def __init__(self, d_model: int, num_heads: int) -> None:
+        super().__init__(d_model, num_heads)
+        self.register_buffer(
+            "_packed_qkv_weight",
+            torch.empty(0),
+            persistent=False,
+        )
+        self.register_buffer("_packed_qkv_bias", torch.empty(0), persistent=False)
+        self._repack_qkv()
+        self.register_load_state_dict_post_hook(self._repack_after_load)
+
+    @torch.no_grad()
+    def _repack_qkv(self) -> None:
+        self._packed_qkv_weight = torch.cat(
+            (self.q_proj.weight, self.k_proj.weight, self.v_proj.weight),
+            dim=0,
+        ).detach()
+        self._packed_qkv_bias = torch.cat(
+            (self.q_proj.bias, self.k_proj.bias, self.v_proj.bias),
+            dim=0,
+        ).detach()
+
+    def _repack_after_load(self, module, incompatible_keys) -> None:
+        del module, incompatible_keys
+        self._repack_qkv()
+
+    def _apply(self, fn, recurse: bool = True):
+        result = super()._apply(fn, recurse=recurse)
+        self._repack_qkv()
+        return result
+
+    def project_qkv(self, x: torch.Tensor):
+        batch, seq_len, _ = x.shape
+        packed = F.linear(x, self._packed_qkv_weight, self._packed_qkv_bias)
+        qkv = packed.view(
+            batch,
+            seq_len,
+            3,
+            self.num_heads,
+            self.head_dim,
+        )
+        q, k, v = qkv.unbind(dim=2)
+        return q.transpose(1, 2), k.transpose(1, 2), v.transpose(1, 2)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        valid_token_mask=None,
+        causal: bool = False,
+    ) -> torch.Tensor:
+        # The packed buffers are inference caches, not trainable parameters.
+        if torch.is_grad_enabled():
+            return super().forward(x, valid_token_mask, causal)
+
+        batch, seq_len, _ = x.shape
+        q, k, v = self.project_qkv(x)
+        attn_mask = (
+            None
+            if valid_token_mask is None
+            else valid_token_mask[:, None, None, :]
+        )
+        context = F.scaled_dot_product_attention(
+            q,
+            k,
+            v,
+            attn_mask=attn_mask,
+            dropout_p=0.0,
+            is_causal=causal,
+            scale=self.scale,
+        )
+        context = context.transpose(1, 2).reshape(batch, seq_len, self.d_model)
+        output = self.out_proj(context)
+        if valid_token_mask is not None:
+            output = output.masked_fill(~valid_token_mask[..., None], 0)
+        return output
+
+
+class Case2PackedQKVTransformer(BaselineTransformer):
+    """Full-model Case-2 experiment with packed QKV and strided-view SDPA."""
+
+    def __init__(self, config) -> None:
+        super().__init__(config)
+        for layer in self.layers:
+            layer.attention = PackedQKVSDPASelfAttention(
+                config.d_model,
+                config.num_heads,
+            )
+
+
 CANDIDATE = CandidateSpec(
     name="projections-control",
     model_factory=ProjectionsControl,
@@ -61,4 +154,16 @@ CANDIDATE = CandidateSpec(
         "Reference-equivalent FFN control expressed with F.linear and exact "
         "GELU; model-dtype intermediates are preserved."
     ),
+)
+
+
+PACKED_CASE2 = CandidateSpec(
+    name="case2-packed-qkv",
+    model_factory=Case2PackedQKVTransformer,
+    owner="Person 3",
+    description=(
+        "Experimental Case-2 route: prepacked QKV projection, strided views, "
+        "and SDPA; use external reduce-overhead compilation."
+    ),
+    unsupported_official_cases=(1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
 )
