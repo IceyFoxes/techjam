@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "source": {
+    "path": "task_shapes.png",
+    "description": "Organizer Appendix: Test Shapes screenshot supplied by the repository owner",
+    "provided_date": "2026-08-29"
+  },
+  "field_mapping": {
+    "qkv_dim": "TransformerConfig.d_model"
+  },
+  "cases": [
+    {"id": 1, "batch_size": 64, "qkv_dim": 128, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 2, "batch_size": 1, "qkv_dim": 128, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 3, "batch_size": 4, "qkv_dim": 128, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 4, "batch_size": 16, "qkv_dim": 128, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 5, "batch_size": 128, "qkv_dim": 128, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 6, "batch_size": 10000, "qkv_dim": 128, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 7, "batch_size": 64, "qkv_dim": 32, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 32},
+    {"id": 8, "batch_size": 64, "qkv_dim": 1024, "heads": 4, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 1024},
+    {"id": 9, "batch_size": 64, "qkv_dim": 128, "heads": 1, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 10, "batch_size": 64, "qkv_dim": 128, "heads": 2, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 11, "batch_size": 64, "qkv_dim": 128, "heads": 16, "seq_len": 128, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 12, "batch_size": 64, "qkv_dim": 128, "heads": 4, "seq_len": 32, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 13, "batch_size": 64, "qkv_dim": 128, "heads": 4, "seq_len": 1024, "layers": 4, "causal": true, "ffn_dim": 128},
+    {"id": 14, "batch_size": 32, "qkv_dim": 1024, "heads": 16, "seq_len": 100000, "layers": 2, "causal": true, "ffn_dim": 1024}
+  ]
+}
