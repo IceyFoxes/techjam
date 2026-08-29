@@ -1,0 +1,228 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.0007752180099487305,
+    "max_relative_error": 1554.287841796875,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 41943040,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.000683903694152832,
+        "max_relative_error": 1554.287841796875,
+        "mean_abs_error": 5.7044788263738155e-05,
+        "optimized_at_worst": 0.8299188017845154,
+        "passed": true,
+        "reference_at_worst": 0.8292348980903625,
+        "seed": 1234,
+        "total_elements": 8388608,
+        "trial": 1,
+        "worst_index": [
+          27,
+          1,
+          84
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0007724761962890625,
+        "max_relative_error": 343.0783996582031,
+        "mean_abs_error": 5.7560911955079064e-05,
+        "optimized_at_worst": 0.7872952818870544,
+        "passed": true,
+        "reference_at_worst": 0.7865228056907654,
+        "seed": 1235,
+        "total_elements": 8388608,
+        "trial": 2,
+        "worst_index": [
+          32,
+          0,
+          50
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0007728636264801025,
+        "max_relative_error": 334.4031982421875,
+        "mean_abs_error": 5.749391857534647e-05,
+        "optimized_at_worst": -0.20519307255744934,
+        "passed": true,
+        "reference_at_worst": -0.20442020893096924,
+        "seed": 1236,
+        "total_elements": 8388608,
+        "trial": 3,
+        "worst_index": [
+          43,
+          3,
+          96
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0007752180099487305,
+        "max_relative_error": 1550.4866943359375,
+        "mean_abs_error": 5.7321107306052e-05,
+        "optimized_at_worst": -1.2045761346817017,
+        "passed": true,
+        "reference_at_worst": -1.2053513526916504,
+        "seed": 1237,
+        "total_elements": 8388608,
+        "trial": 4,
+        "worst_index": [
+          17,
+          1,
+          2
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0006080269813537598,
+        "max_relative_error": 1415.2557373046875,
+        "mean_abs_error": 5.7916917285183445e-05,
+        "optimized_at_worst": 0.749096155166626,
+        "passed": true,
+        "reference_at_worst": 0.7484881281852722,
+        "seed": 1238,
+        "total_elements": 8388608,
+        "trial": 5,
+        "worst_index": [
+          13,
+          275,
+          56
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "description": "Framework fast-path and compilation candidate (reference scaffold).",
+    "name": "compiler",
+    "owner": "Person 1",
+    "selector": "compiler",
+    "strict_weight_copy": true
+  },
+  "command": "/home/kevin/techjam/.venv/bin/python /home/kevin/techjam/src/benchmark.py --candidate compiler --case 13 --device cuda --dtype float32 --compile-user --compile-mode default --accuracy-trials 5 --repeats 20 --settle-seconds 10 --sample-target-ms 50 --output research/benchmarks/2026-08-29-rtx5080-6bde871/case13-fp32-default.json",
+  "config": {
+    "batch_size": 64,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 4,
+    "num_layers": 4,
+    "seq_len": 1024
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 666101129216,
+      "path": "/home/kevin/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "6bde871dd65051fcace36971b27a86771365ba1e",
+    "dirty": true,
+    "status": "?? research/benchmarks/"
+  },
+  "input_scale": 1.0,
+  "nvtx_enabled": false,
+  "official_case_id": 13,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.0,
+  "performance": {
+    "baseline": {
+      "mean_ms": 81.10411834716797,
+      "median_ms": 81.27952194213867,
+      "min_ms": 79.27311706542969,
+      "p90_ms": 82.37933807373048,
+      "samples_ms": [
+        80.12944030761719,
+        79.34620666503906,
+        79.71532440185547,
+        81.0132827758789,
+        79.72966766357422,
+        81.14128112792969,
+        81.62406158447266,
+        81.41776275634766,
+        81.87494659423828,
+        80.9948501586914,
+        79.27311706542969,
+        81.51094055175781,
+        79.36617279052734,
+        81.76627349853516,
+        82.09967803955078,
+        83.17890930175781,
+        81.79705810546875,
+        80.4137954711914,
+        83.39910125732422,
+        82.29049682617188
+      ],
+      "tokens_per_second": 806303.954969787
+    },
+    "block_size": 1,
+    "candidate": {
+      "mean_ms": 25.630315208435057,
+      "median_ms": 25.564080238342285,
+      "min_ms": 24.61801528930664,
+      "p90_ms": 26.446546363830564,
+      "samples_ms": [
+        26.40652847290039,
+        25.124895095825195,
+        26.080799102783203,
+        25.555007934570312,
+        25.1059513092041,
+        24.717376708984375,
+        25.141216278076172,
+        26.72492790222168,
+        25.955839157104492,
+        24.61801528930664,
+        25.036447525024414,
+        25.573152542114258,
+        25.954816818237305,
+        26.25152015686035,
+        25.080480575561523,
+        24.759456634521484,
+        26.994176864624023,
+        26.375232696533203,
+        26.41561508178711,
+        24.734848022460938
+      ],
+      "tokens_per_second": 2563597.0232054675
+    },
+    "gpu_state": {
+      "clocks.mem": "15001",
+      "clocks.sm": "2842",
+      "clocks_throttle_reasons.active": "0x0000000000000400",
+      "power.draw": "235.35",
+      "power.limit": "360.00",
+      "temperature.gpu": "58"
+    },
+    "noise_floor_ratio": 0.05653822690959348,
+    "repeats": 20,
+    "settle_seconds": 10.0,
+    "significant": true,
+    "speedup": 3.179442451453097,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "paired"
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-29T06:00:41.439520+00:00"
+}
