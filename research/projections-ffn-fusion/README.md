@@ -26,6 +26,10 @@ is the executable definition of the required computation and correctness behavio
   correctness, layout, profiler, and heuristic timing screen against the current
   SDPA plus strided-view route. Case #2 is the only implementation candidate to
   survive the compiled whole-model gate.
+- [Second-pass direction screen](second-pass-after-measurements.md): official
+  library/source search after the measured packed-QKV and narrow-FFN decisions.
+  It leaves one bounded FP32 output-GEMM-plus-residual epilogue screen and gives
+  explicit stop decisions for every official case family.
 - [Feasibility gate: Case #14 memory analysis](feasibility-gate.md): original
   analysis, **stale in part as of 29 August 2026** because it counts a transpose
   view as an allocation, miscounts model weights, and overstates what baseline
