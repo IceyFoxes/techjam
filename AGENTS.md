@@ -23,3 +23,10 @@
 - Do not edit, move, rename, format, or otherwise modify the root `torch_transformer_benchmark.py`. If an editable harness is needed, copy it under `src/` and modify only the copy.
 - Push branch checkpoints frequently and synchronize with `master` without rewriting a shared branch.
 - Submit code through an MR/PR that explains the problem, decision and alternatives, affected behavior, expected performance impact, risks, numerical-correctness evidence, benchmark environment and results, and verification commands.
+
+## Testing
+
+- Preserve baseline, optimization-checkpoint, regression, and final benchmark runs under `research/benchmarks/<date>-<gpu>-<commit>/`; do not commit every exploratory run.
+- For each preserved run, record the exact command, Git commit, timestamp, input shapes, dtype, correctness result, latency, and speedup, plus CPU, GPU, OS, GPU driver, CUDA, and PyTorch versions.
+- Keep small Markdown or JSON results in Git. Store large profiler traces outside Git and link to them from the run document.
+- Never overwrite a recorded run. Mark invalid, stale, or superseded runs in `research/benchmarks/README.md`, with the date, reason, and replacement link when applicable.
