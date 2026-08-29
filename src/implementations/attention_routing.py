@@ -67,3 +67,28 @@ def select_route(
         return Route.SDPA_CAUSAL_KEYMASK if prefer_keymask else Route.SDPA_CAUSAL
 
     return Route.SDPA_FULLMASK
+
+
+def classify_mask(valid_token_mask: Optional[Any]) -> MaskKind:
+    """Classify a ``[B, N]`` boolean mask. Performs ONE host synchronization.
+
+    A mask is ``PREFIX`` when it never rises along the sequence axis, which is
+    exactly the right-padded shape ``generate_random_case`` produces. Callers
+    must invoke this once per forward, above the layer loop: evaluating an
+    equivalent predicate per layer was measured to turn a 1.15-1.43x gain into a
+    0.82-0.95x loss.
+
+    It must also never be called from inside a compiled or graph-replayed
+    region. ``sdpa.py`` avoids host mask inspection for exactly this reason:
+    the synchronization breaks CUDA-graph replay, which the dispatcher relies
+    on for cases 1-12 under ``reduce-overhead``.
+    """
+    if valid_token_mask is None:
+        return MaskKind.ABSENT
+
+    if valid_token_mask.shape[-1] <= 1:
+        # A single position cannot rise, so it is trivially prefix-valid.
+        return MaskKind.PREFIX
+
+    non_increasing = bool((valid_token_mask[:, :-1] >= valid_token_mask[:, 1:]).all())
+    return MaskKind.PREFIX if non_increasing else MaskKind.GENERAL
