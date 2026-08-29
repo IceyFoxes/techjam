@@ -116,3 +116,38 @@ contributes nothing numerically.
 Each JSON holds the exact command, git state, shape, dtype, thresholds,
 per-trial correctness, raw latency samples, noise floor, memory, and full
 environment.
+
+## Case 6 — correctness and memory only, not a latency claim
+
+Case 6 (`B=10000`) is nominally Person 4's extreme-shape scope. It is validated
+here because SDPA addresses its failure mode directly: the eager path
+materializes a ~2.6 GB float32 score tensor that SDPA never allocates.
+
+| Metric | Value |
+| --- | --- |
+| Correctness | **PASS 2/2 seeds**, 0 failed of 163,840,000 elements per trial |
+| `max_abs` | 7.59e-04 / 7.63e-04 |
+| Baseline | 12,446.9 ms |
+| Candidate | 12,008.5 ms |
+| Ratio | 1.037x, floor ±19.42% — **`WITHIN NOISE`** |
+| Peak allocated | 11,166,121,984 B (**10,648 MiB**) |
+| Peak reserved | 13,123,977,216 B (12,516 MiB) |
+
+**The latency figure is not usable and must not be quoted.** Two independent
+reasons:
+
+1. The harness itself classifies it `WITHIN NOISE` at 10 repeats. Per
+   `src/infra/timing.py`, a ratio inside its own floor is no change.
+2. Peak allocation of 10,648 MiB exceeds this card's 8,188 MiB, so the run
+   completed only because WSL2 permitted oversubscription into host memory.
+   Both sides were paging over PCIe, which compresses the ratio between a
+   memory-hungry baseline and a memory-lean candidate.
+
+What case 6 does establish is that the candidate is **correct** at this shape and
+that its memory profile is recorded. A latency claim needs a device that holds
+the working set resident. Handed to Person 4 with that caveat.
+
+An earlier exploratory run of the same shape on the legacy torch 2.6.0+cu124
+stack reported 2.032x, also under oversubscription and therefore equally
+unusable. It is mentioned only so the discrepancy is not mistaken for a
+regression.
