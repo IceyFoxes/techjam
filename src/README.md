@@ -122,6 +122,15 @@ Case 8 currently retains the reference projection/FFN layout around SDPA. Its
 planned packed-QKV specialization remains a separate integration step because
 the Person 3 packed-QKV implementation is not yet available.
 
+Person 3's experimental packed-QKV route is intentionally limited to Case 2 and
+is loaded with `--candidate projections:PACKED_CASE2`. It retains the reference
+Q/K/V parameter names, rebuilds non-persistent packed buffers outside timed
+execution, and expects `--compile-user --compile-mode reduce-overhead`. It is not
+part of the dispatcher pending exact RTX 5080 validation. The official harness
+does not mutate parameters after compilation; other callers must invoke
+`refresh_packed_qkv()` on each attention module after out-of-band parameter
+mutation and before compiling or replaying inference.
+
 ### End-to-end dummy check
 
 The `dummy` candidate runs the exact reference path, then performs a bounded and
