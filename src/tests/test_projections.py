@@ -324,6 +324,14 @@ class PackedQKVCandidateTests(unittest.TestCase):
             set(range(1, 15)) - {2},
         )
 
+    def test_cross_case_validation_candidate_excludes_only_extremes(self):
+        from src.implementations.projections import PACKED_ALL
+
+        PACKED_ALL.validate()
+        self.assertEqual(PACKED_ALL.name, "packed-qkv-cross-case-validation")
+        self.assertFalse(PACKED_ALL.self_compiling)
+        self.assertEqual(PACKED_ALL.unsupported_official_cases, (6, 14))
+
 
 if __name__ == "__main__":
     unittest.main()

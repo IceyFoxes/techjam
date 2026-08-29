@@ -87,3 +87,15 @@ PACKED_CASE2 = CandidateSpec(
     ),
     unsupported_official_cases=(1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14),
 )
+
+
+PACKED_ALL = CandidateSpec(
+    name="packed-qkv-cross-case-validation",
+    model_factory=Case2PackedQKVTransformer,
+    owner="Person 1 validation / Person 3 implementation",
+    description=(
+        "Validation-only packed-QKV, strided-view SDPA candidate for every "
+        "memory-feasible official case; requires external compilation."
+    ),
+    unsupported_official_cases=(6, 14),
+)
