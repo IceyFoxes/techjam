@@ -110,5 +110,25 @@ class OfficialCasesTests(unittest.TestCase):
         )
 
 
+class BenchmarkMemoryTests(unittest.TestCase):
+    def test_cpu_memory_probe_is_explicitly_unavailable(self) -> None:
+        try:
+            import torch
+        except ImportError:
+            self.skipTest("PyTorch is not installed")
+
+        from src.benchmark import _cuda_memory_probe
+
+        self.assertIsNone(
+            _cuda_memory_probe(
+                baseline=object(),
+                candidate=object(),
+                x=torch.empty(0),
+                valid_mask=torch.empty(0, dtype=torch.bool),
+                device=torch.device("cpu"),
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
