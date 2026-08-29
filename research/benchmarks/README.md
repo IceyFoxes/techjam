@@ -5,6 +5,10 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-29-rtx5080-330cf60/`](2026-08-29-rtx5080-330cf60/README.md): Person 1
+  integrated float32 SDPA, strided-view, and `reduce-overhead` evidence for
+  cases 1, 3, 4, 5, 7, and 9-12; all nine pass 5/5 seeds and show significant
+  gains, with a 3.397x geometric mean.
 - [`2026-08-29-rtx5080-6bde871/`](2026-08-29-rtx5080-6bde871/README.md): Person 1
   compiler-mode checkpoints and rejected numerical routes on an RTX 5080.
 

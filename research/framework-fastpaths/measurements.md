@@ -1,6 +1,36 @@
 # RTX 5080 Compiler Measurements
 
-## Status
+## Integrated Nine-Case Checkpoint
+
+On 29 August 2026, the implementation probe at branch commit `330cf60` composed
+Person 2's float32 SDPA and strided Q/K/V views with Person 1's
+`reduce-overhead` route. Preserved whole-model runs now cover the nine ordinary
+cases that lacked Person 1 checkpoints: 1, 3, 4, 5, 7, 9, 10, 11, and 12.
+
+All nine passed five of five seeds with zero failed output elements, and all
+nine improvements cleared their run-specific noise floors. The geometric-mean
+speedup is 3.397x. Full raw evidence and method are in
+[`../benchmarks/2026-08-29-rtx5080-330cf60/`](../benchmarks/2026-08-29-rtx5080-330cf60/README.md).
+
+| Case | Baseline ms | Integrated ms | Speedup | Noise floor | Accuracy |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | 1.8277 | 0.7346 | 2.488x | ±32.12% | PASS 5/5 |
+| 3 | 0.9096 | 0.1836 | 4.955x | ±53.56% | PASS 5/5 |
+| 4 | 1.1079 | 0.2356 | 4.702x | ±93.73% | PASS 5/5 |
+| 5 | 2.6553 | 1.0863 | 2.444x | ±27.56% | PASS 5/5 |
+| 7 | 1.4667 | 0.4328 | 3.389x | ±21.91% | PASS 5/5 |
+| 9 | 1.1761 | 0.5527 | 2.128x | ±45.86% | PASS 5/5 |
+| 10 | 1.3927 | 0.5374 | 2.592x | ±30.82% | PASS 5/5 |
+| 11 | 6.2062 | 1.1544 | 5.376x | ±10.34% | PASS 5/5 |
+| 12 | 0.8274 | 0.1957 | 4.227x | ±21.76% | PASS 5/5 |
+
+This supersedes the 29 August exploratory-only status for these nine cases.
+Exact values for cases 3, 4, and 9 remain noisy because the candidate paths are
+sub-millisecond. The route is nevertheless a strong dispatcher baseline for
+each exact tuple; adversarial correctness, padding timing, graph-stability, and
+peak-memory gates remain before final acceptance.
+
+## Compiler-Control Status
 
 - Date: 29 August 2026.
 - Benchmark revision: `6bde871dd65051fcace36971b27a86771365ba1e`.
@@ -12,7 +42,8 @@
 
 These are whole-model framework controls, not final integrated results. The
 Person 2 SDPA and Person 3 projection implementations were not present in the
-candidate during these runs.
+candidate during these runs. The newer nine-case checkpoint above composes
+Person 2's SDPA/view route, but still does not include Person 3 projections.
 
 ## Environment
 
@@ -93,17 +124,20 @@ checkpoints:
 - case 7 float16: raw reduce-overhead failed 8/8 seeds; cast emulation passed
   8/8 in that exploratory run but is not a global solution.
 
-These values guide the next experiment matrix but do not replace preserved final
-runs for cases 1, 3, 4, 5, 7, 9-12.
+This list is preserved as historical experiment-selection evidence. Its status
+for cases 1, 3, 4, 5, 7, and 9-12 was superseded on 29 August 2026 by the
+integrated records above.
 
 ## Limits
 
 - Compilation time and peak compiler memory were not measured.
-- Cases 4-6, 9-11, 12, and 14 do not yet have preserved Person 1 checkpoints.
+- Cases 6 and 14 do not yet have preserved Person 1 checkpoints; their extreme
+  shapes require a memory-safe backend before this compiler route is attempted.
 - The case 2 fp16 pass is only eight Gaussian seeds at the default input scale
   and zero padding; it is not an acceptance-quality adversarial matrix.
-- No measurement yet composes compiler modes with Person 2 SDPA or Person 3
-  packed projections.
+- Nine cases now compose `reduce-overhead` with Person 2's SDPA/view approach;
+  cases 2, 8, and 13 still need same-machine integrated comparison, and no
+  measurement yet includes Person 3 packed projections.
 - CUDA Graph retained-memory cost must be measured before using it on cases 5,
   6, 8, 13, or 14.
 
