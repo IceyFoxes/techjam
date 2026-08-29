@@ -180,5 +180,147 @@ class MaskRoutedSDPASelfAttentionTests(unittest.TestCase):
         )
 
 
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+class AttentionCandidateTests(unittest.TestCase):
+    def _config(self, causal=True):
+        from torch_transformer_benchmark import TransformerConfig
+
+        return TransformerConfig(
+            batch_size=2, seq_len=8, d_model=16, num_heads=4,
+            ffn_dim=16, num_layers=2, causal=causal,
+        )
+
+    def _models(self, config, prefer_keymask=False):
+        from torch_transformer_benchmark import BaselineTransformer, copy_model_weights
+        from src.implementations.attention import AttentionCandidate
+
+        torch.manual_seed(3)
+        baseline = BaselineTransformer(config).eval()
+        candidate = AttentionCandidate(config, prefer_keymask=prefer_keymask).eval()
+        copy_model_weights(baseline, candidate, strict=True)
+        return baseline, candidate
+
+    def test_strict_weight_copy_succeeds(self) -> None:
+        baseline, candidate = self._models(self._config())
+        self.assertEqual(list(baseline.state_dict()), list(candidate.state_dict()))
+
+    def test_matches_reference_across_padding_ratios(self) -> None:
+        from torch_transformer_benchmark import compare_outputs, generate_random_case
+
+        config = self._config()
+        for prefer_keymask in (False, True):
+            for ratio in (0.0, 0.3, 0.9):
+                with self.subTest(ratio=ratio, prefer_keymask=prefer_keymask):
+                    baseline, candidate = self._models(config, prefer_keymask)
+                    x, mask = generate_random_case(
+                        config, torch.device("cpu"), torch.float32, 11, ratio, 1.0
+                    )
+                    with torch.inference_mode():
+                        result = compare_outputs(
+                            baseline(x, mask), candidate(x, mask), 0.02, 0.002
+                        )
+                    self.assertTrue(result.passed, msg=f"{result.failed_elements} failed")
+
+    def test_non_causal_config_matches_reference(self) -> None:
+        from torch_transformer_benchmark import compare_outputs, generate_random_case
+
+        config = self._config(causal=False)
+        baseline, candidate = self._models(config)
+        x, mask = generate_random_case(
+            config, torch.device("cpu"), torch.float32, 13, 0.3, 1.0
+        )
+        with torch.inference_mode():
+            result = compare_outputs(baseline(x, mask), candidate(x, mask), 0.02, 0.002)
+        self.assertTrue(result.passed, msg=f"{result.failed_elements} failed")
+
+    def test_general_mask_config_matches_reference(self) -> None:
+        """A non-prefix mask must route away from the prefix shortcut."""
+        from torch_transformer_benchmark import compare_outputs
+
+        config = self._config()
+        baseline, candidate = self._models(config)
+        torch.manual_seed(9)
+        x = torch.randn(2, 8, 16)
+        mask = torch.tensor(
+            [[False, True, True, True, True, False, True, True],
+             [True, True, False, True, True, True, True, True]]
+        )
+        x = x.masked_fill(~mask[..., None], 0)
+        with torch.inference_mode():
+            result = compare_outputs(baseline(x, mask), candidate(x, mask), 0.02, 0.002)
+        self.assertTrue(result.passed, msg=f"{result.failed_elements} failed")
+
+    def test_classifies_the_mask_once_per_forward(self) -> None:
+        """The host sync must not scale with layer count."""
+        from src.implementations import attention as attention_module
+
+        config = self._config()
+        _, candidate = self._models(config)
+        calls = []
+        original = attention_module.classify_mask
+
+        def counting(mask):
+            calls.append(mask)
+            return original(mask)
+
+        attention_module.classify_mask = counting
+        self.addCleanup(setattr, attention_module, "classify_mask", original)
+
+        x = torch.randn(2, 8, 16)
+        mask = torch.ones(2, 8, dtype=torch.bool)
+        with torch.inference_mode():
+            candidate(x, mask)
+
+        self.assertEqual(len(calls), 1, msg=f"{config.num_layers} layers")
+
+    def test_route_reaches_every_layer(self) -> None:
+        from src.implementations.attention_routing import Route
+
+        _, candidate = self._models(self._config())
+        x = torch.randn(2, 8, 16)
+        mask = torch.ones(2, 8, dtype=torch.bool)
+        with torch.inference_mode():
+            candidate(x, mask)
+        for layer in candidate.layers:
+            self.assertIs(layer.attention.route, Route.SDPA_CAUSAL)
+
+    def test_both_candidate_specs_are_loadable(self) -> None:
+        from src.infra import load_candidate
+
+        self.assertEqual(load_candidate("attention").name, "attention")
+        self.assertEqual(
+            load_candidate("attention:KEYMASK_CANDIDATE").name, "attention-keymask"
+        )
+
+
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+class ExactEagerDtypeTests(unittest.TestCase):
+    def test_reduced_precision_routes_are_bitwise_identical(self) -> None:
+        """float16/bfloat16 fall to an exact route and reproduce the reference."""
+        from torch_transformer_benchmark import (
+            BaselineTransformer, TransformerConfig, copy_model_weights,
+            generate_random_case,
+        )
+        from src.implementations.attention import AttentionCandidate
+
+        config = TransformerConfig(
+            batch_size=2, seq_len=8, d_model=16, num_heads=4,
+            ffn_dim=16, num_layers=2, causal=True,
+        )
+        for dtype in (torch.float16, torch.bfloat16):
+            for ratio in (0.0, 0.3):
+                with self.subTest(dtype=dtype, ratio=ratio):
+                    torch.manual_seed(5)
+                    baseline = BaselineTransformer(config).to(dtype).eval()
+                    candidate = AttentionCandidate(config).to(dtype).eval()
+                    copy_model_weights(baseline, candidate, strict=True)
+                    x, mask = generate_random_case(
+                        config, torch.device("cpu"), dtype, 17, ratio, 1.0
+                    )
+                    with torch.inference_mode():
+                        delta = (baseline(x, mask) - candidate(x, mask)).abs().max()
+                    self.assertEqual(delta.item(), 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()

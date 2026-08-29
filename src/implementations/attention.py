@@ -145,3 +145,58 @@ class MaskRoutedSDPASelfAttention(StridedSDPASelfAttention):
         if valid_token_mask is not None:
             output = output.masked_fill(~valid_token_mask[..., None], 0)
         return output
+
+
+class AttentionCandidate(BaselineTransformer):
+    """Reference Transformer whose attention cores are mask-routed.
+
+    The mask is classified once here, above the layer loop, and the resulting
+    route is pushed into every layer before it runs. This method is the
+    uncompiled dispatch layer: the host synchronization must stay here and
+    never move inside a compiled or graph-replayed region.
+    """
+
+    def __init__(
+        self, config: TransformerConfig, prefer_keymask: bool = False
+    ) -> None:
+        super().__init__(config)
+        self.prefer_keymask = prefer_keymask
+        for layer in self.layers:
+            layer.attention = MaskRoutedSDPASelfAttention(
+                config.d_model, config.num_heads
+            )
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        valid_token_mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        # The single host synchronization for this forward pass.
+        route = select_route(
+            x.dtype == torch.float32,
+            self.config.causal,
+            classify_mask(valid_token_mask),
+            prefer_keymask=self.prefer_keymask,
+        )
+        for layer in self.layers:
+            layer.attention.route = route
+        return super().forward(x, valid_token_mask)
+
+
+def _keymask_factory(config: TransformerConfig) -> AttentionCandidate:
+    return AttentionCandidate(config, prefer_keymask=True)
+
+
+CANDIDATE = CandidateSpec(
+    name="attention",
+    model_factory=AttentionCandidate,
+    owner="Person 2",
+    description="Mask-routed float32 SDPA with an exact eager fallback.",
+)
+
+KEYMASK_CANDIDATE = CandidateSpec(
+    name="attention-keymask",
+    model_factory=_keymask_factory,
+    owner="Person 2",
+    description="Mask-routed SDPA retaining the broadcast key mask; A/B control.",
+)
