@@ -35,9 +35,7 @@ root with:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/python -m pip install numpy==2.5.2
-.venv/bin/python -m pip install torch==2.13.0 \
-  --index-url https://download.pytorch.org/whl/cu130
+.venv/bin/python -m pip install -r requirements.txt
 ```
 
 On Debian or Ubuntu, `python3 -m venv` normally requires the matching
