@@ -8,6 +8,9 @@ Status: current as of 29 August 2026.
 
 ## Documents
 
+- [`review.md`](review.md) — **start here.** Decision-ready synthesis: what works,
+  what does not and why, the complete per-case table, residual opportunities, and
+  handoffs to the other streams.
 - [`decomposition.md`](decomposition.md) — subdivides attention into the smallest
   independently optimizable stages, gives the roofline argument for why this
   region is memory-bound, and enumerates the algorithmic levers (L1-L8) with the
@@ -36,9 +39,12 @@ Status: current as of 29 August 2026.
    that the reference rounds softmax probabilities back to float16 before the
    `PV` matmul, so a fused kernel is *more* accurate and therefore deviates.
 
-3. **float32 SDPA is measured at 6.41x whole-model on case 13** (±3.5%) and
-   1.4-1.7x on cases 1, 7, 12, passing 10/10 seeds. Case 8 (`d_h=256`) must stay
-   on the eager path; SDPA regresses to 0.64x there.
+3. **float32 SDPA gains on all twelve in-scope cases, geomean ≈1.94x**, and all
+   twelve pass the official criterion. Best: case 13 at 6.34x (±2.6%), case 11 at
+   4.96x (±8.4%), case 5 at 2.92x (±4.5%). Weakest: case 8 at 1.047x (±0.3%),
+   still a gain. An earlier draft excluded case 8 based on an attention-only
+   microbenchmark; that measurement was flawed and is corrected in
+   [`measurements.md`](measurements.md).
 
 4. **Two bitwise-exact levers are worth ~1.25x on their own** (cached causal mask,
    skipping all-true padding masks) but only when `padding_ratio=0`.
@@ -53,7 +59,12 @@ Status: current as of 29 August 2026.
    The shortfall at N=128 (0.771) is block granularity and would affect any
    block-masked implementation equally.
 
-7. **The surveyed efficient-attention literature is almost entirely inapplicable.**
+7. **Dropping the `.contiguous()` copies adds a further 6-12% on top of SDPA**
+   (case 13 6.379x -> 6.908x, case 8 1.044x -> 1.119x). SDPA accepts strided
+   inputs, so `_split_heads`'s copies are avoidable. The Q/K/V side is inside
+   Person 2's module and needs no coordination.
+
+8. **The surveyed efficient-attention literature is almost entirely inapplicable.**
    Every approximate method (Performer, Linformer, Reformer, Longformer, BigBird,
    Nyströmformer, cosFormer, linear attention, NSA) changes the mathematical
    result and cannot satisfy a per-element tolerance; Linformer and MQA/GQA

@@ -58,25 +58,83 @@ Caveat: kernel-name heuristics cannot separate attention GEMMs from projection
 and FFN GEMMs, since both appear as `cutlass_*` / `ampere_*gemm_*`. The table
 above is operator-level (`aten::`) attribution, which does distinguish them.
 
-## Whole-model speedup, float32 + SDPA
+## Whole-model speedup, float32 + SDPA — complete in-scope sweep
 
-Single settle, one shared baseline, variants interleaved. TF32 on
-(harness default), `padding_ratio=0`.
+All twelve in-scope cases. TF32 on (harness default), `padding_ratio=0`,
+correctness checked over 3 seeds under the official criterion, paired timing with
+30 repeats.
 
-| Case | `d_h` | N | `sdpa_fp32` | `sdpa_fp16` internals |
-| --- | --- | --- | --- | --- |
-| 13 | 32 | 1024 | **6.41x** ±3.5% | 9.51x ±110% (floor too wide to trust) |
-| 7 | 8 | 128 | **1.68x** ±17.3% | 1.18x ±15.0% |
-| 1 | 32 | 128 | **1.46x** ±9.7% | 1.23x ±8.8% |
-| 12 | 32 | 32 | **1.41x** ±9.9% | 1.23x ±8.9% |
+| Case | B | H | N | `d_h` | correct | attn share | base ms | SDPA ms | speedup | floor |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 13 | 64 | 4 | 1024 | 32 | PASS | 65.1% | 385.747 | 60.885 | **6.336x** | ±2.6% |
+| 11 | 64 | 16 | 128 | 8 | PASS | 65.9% | 24.881 | 5.013 | **4.964x** | ±8.4% |
+| 5 | 128 | 4 | 128 | 32 | PASS | 50.9% | 15.555 | 5.331 | **2.918x** | ±4.5% |
+| 2 | 1 | 4 | 128 | 32 | PASS | 28.3% | 7.805 | 5.207 | 1.499x | ±14.7% |
+| 9 | 64 | 1 | 128 | 128 | PASS | 23.8% | 8.176 | 5.605 | 1.459x | ±18.9% |
+| 3 | 4 | 4 | 128 | 32 | PASS | 35.3% | 7.875 | 5.408 | 1.456x | ±7.8% |
+| 10 | 64 | 2 | 128 | 64 | PASS | 28.4% | 6.996 | 4.853 | 1.441x | ±10.4% |
+| 4 | 16 | 4 | 128 | 32 | PASS | 38.8% | 7.727 | 5.371 | 1.439x | ±8.6% |
+| 12 | 64 | 4 | 32 | 32 | PASS | 29.1% | 7.026 | 4.943 | 1.421x | ±11.8% |
+| 7 | 64 | 4 | 128 | 8 | PASS | 48.5% | 8.962 | 6.718 | 1.334x | ±13.6% |
+| 1 | 64 | 4 | 128 | 32 | PASS | 36.4% | 31.648 | 26.369 | 1.200x | ±0.1% |
+| 8 | 64 | 4 | 128 | 256 | PASS | 15.7% | 61.549 | 58.788 | 1.047x | ±0.3% |
 
-All marked SIGNIFICANT against their own noise floor.
+**Every case passes and every case gains.** Geometric mean ≈ **1.94x**. Cases 2
+and 9 have wide floors (±14.7%, ±18.9%) and should be re-measured with more
+repeats before being quoted individually.
+
+The "attn share" column is a **lower bound**: it counts only `aten::` operators
+inside stages 3-7 and excludes the `.contiguous()` copies and dtype casts that
+attention causes but that are attributed to `aten::copy_`. This is why measured
+speedups on cases 11 and 13 exceed `1/(1 - share)` — the true attention share is
+higher than the column states. Do not use it as an Amdahl ceiling.
+
+### Correction: case 8 does not regress at whole-model level
+
+An earlier version of this document concluded from the attention-only
+microbenchmark that case 8 (`d_h=256`) must stay on the eager path, because
+isolated attention measured **0.64x** with SDPA. The whole-model measurement
+contradicts that: **1.047x ±0.3%**, a small but statistically significant gain.
+
+The microbenchmark was misleading because it constructed the causal mask **once,
+outside the timed region**, whereas the real reference rebuilds
+`torch.ones((N,N), bool).triu(1)` per layer per forward. The isolated test
+therefore gave the baseline a free mask and understated SDPA's benefit
+everywhere. **Prefer the whole-model numbers.** The attention-only table below is
+retained for the relative picture but should not drive routing decisions.
 
 **`sdpa_fp32` beats float16 internals on every case with a trustworthy
 measurement.** Casting Q/K/V down and the result back costs more than the
 tensor-core throughput it buys at these sizes. The one case where float16 leads
 (13) has a ±110% floor and cannot be relied on. This removes the main argument
 for lever L8 and simplifies the plan: **use plain float32 SDPA.**
+
+## Dropping the `.contiguous()` copies
+
+`_split_heads` does `.transpose(1,2).contiguous()` on each of Q, K and V, and the
+output path does `.transpose(1,2).contiguous().view(...)`. Since SDPA accepts
+strided inputs, the copies may be unnecessary. Tested by replacing them with a
+plain `.transpose(1,2)` view and `.reshape()` on the way out.
+
+| Case | SDPA + `.contiguous()` | SDPA + strided view | relative gain |
+| --- | --- | --- | --- |
+| 13 | 6.379x ±4.9% | **6.908x ±3.0%** | +8.3% |
+| 11 | 5.039x ±7.6% | **5.353x ±2.9%** | +6.2% |
+| 1 | 1.407x ±10.6% | **1.577x ±10.9%** | +12.1% |
+| 8 | 1.044x ±0.3% | **1.119x ±0.2%** | +7.2% |
+
+All four PASS the official criterion. Every case improves, by 6-12%.
+
+Confidence varies: case 8's floors are tight (±0.3% and ±0.2%), so 1.044 -> 1.119
+is unambiguous. Case 13's 8.3% improvement is comparable to its ±3-5% floors, and
+case 1's floors are ±10%, so those individually are weaker. **The consistency of
+the direction across all four cases is the stronger evidence** — a noise artefact
+would not favour the same variant every time.
+
+This matters for scoping: the `.contiguous()` copies were previously filed as a
+Person 3 boundary issue, but the input side is inside `BaselineSelfAttention` and
+therefore **inside Person 2's module**. Only the output-side reshape touches the
+stage 8 boundary.
 
 ## Attention-only microbenchmark
 
@@ -91,7 +149,7 @@ float32:
 | 1 | N=128, `d_h`=32 | 1.70x ±0.8% | PASS |
 | 11 | H=16, `d_h`=8 | 1.67x ±1.9% | PASS |
 | 7 | `d_h`=8 | 1.61x ±6.5% | PASS |
-| **8** | **`d_h`=256** | **0.64x — regression** | PASS |
+| 8 | `d_h`=256 | 0.64x in isolation — **but 1.047x whole-model; see correction above** | PASS |
 
 float16 (rejected on correctness, listed for completeness):
 

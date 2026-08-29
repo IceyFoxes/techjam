@@ -194,6 +194,21 @@ rediscovering. Note also that the harness's default TF32 has already spent most
 of the budget: headroom drops from ~1600x to ~1.5-2x with `--allow-tf32` on. See
 [`sdpa-and-precision.md`](sdpa-and-precision.md).
 
+### L9. Feed SDPA strided views instead of contiguous copies
+
+`_split_heads` forces `.transpose(1,2).contiguous()` on each of Q, K and V, and
+the output path repeats the pattern. Profiling puts `aten::copy_` plus
+`Memcpy DtoD` at **7.1x the attention matmul** on case 13.
+
+SDPA accepts strided inputs, so the copies are avoidable. Measured: replacing
+them with plain transposed views and a `.reshape()` on output adds **6-12% on top
+of SDPA** (case 13 6.379x -> 6.908x, case 11 5.039x -> 5.353x, case 8
+1.044x -> 1.119x), correct on every case tested.
+
+The Q/K/V side is inside `BaselineSelfAttention` and therefore inside Person 2's
+module; only the output reshape touches the stage 8 boundary shared with
+Person 3.
+
 ## Lever-to-stage map
 
 | Lever | Removes / changes | Stages | Safe in fp32 | Safe in fp16 |
@@ -206,6 +221,7 @@ of the budget: headroom drops from ~1600x to ~1.5-2x with `--allow-tf32` on. See
 | L6 cached / implicit mask | mask alloc + `N²` pass | 5 | yes | **yes (bitwise)** |
 | L7 skip no-op padding mask | one `S` read+write | 5 | yes | **yes (bitwise)** |
 | ~~L8 low-precision internals~~ | ~~GEMM throughput~~ | 3,7 | rejected (slower) | n/a |
+| L9 strided views, no copies | 3 Q/K/V copies + output copy | 2,8 | yes (+6-12%) | untested |
 
 Only L6 and L7 are bitwise-exact. Everything else reassociates arithmetic, which
 float32 tolerates comfortably and float16 does not.
@@ -216,12 +232,15 @@ float32 tolerates comfortably and float16 does not.
    whole-model on case 13** (±3.5%), 1.4-1.7x on cases 1, 7, 12.
 2. **L6 + L7** — bitwise-exact, apply everywhere including shapes where SDPA
    loses. Must hoist the all-true test to one host sync per forward.
-3. **Stage 2/8 layout work, jointly with Person 3.** With L1-L5 delivered by
-   SDPA, the largest remaining attention-adjacent cost is `aten::copy_` +
-   `Memcpy DtoD` at **7.1x the attention matmul** on case 13, from
-   `_split_heads().contiguous()` and the context transpose.
-4. Leave case 8 (`d_h=256`) on the eager path; SDPA regresses to 0.64x there and
-   the projections dominate that case anyway (Person 3).
+3. **L9 — drop the `.contiguous()` copies**, measured at a further 6-12% on top
+   of SDPA. The Q/K/V side needs no coordination; only the output reshape touches
+   Person 3's boundary.
+4. **Apply SDPA to every in-scope case, including case 8.** The full sweep shows
+   all twelve pass and all twelve gain; case 8 is the weakest at 1.047x ±0.3% but
+   is still a gain, and its attention share is only 15.7% so the projections
+   dominate it (Person 3). An earlier draft advised excluding case 8 based on an
+   attention-only microbenchmark that hoisted mask construction out of the timed
+   region; see the correction in [`measurements.md`](measurements.md).
 
 L3 and L8 both turned out not to need work: L3 is already implemented inside
 SDPA, and L8 was measured slower. Cases 6 and 14 are Person 4's. Cases 2, 3 and
