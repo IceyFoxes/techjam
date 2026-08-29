@@ -8,6 +8,10 @@ Status: current as of 29 August 2026.
 
 ## Documents
 
+- [`safe-optimization-spec.md`](safe-optimization-spec.md) — the implementation
+  design for the optimizations that gain on every in-scope case at no correctness
+  cost: route table, module layout, validation matrix, and acceptance criteria.
+  Contains the section 3 finding that corrects the padding conclusions below.
 - [`review.md`](review.md) — **start here.** Decision-ready synthesis: what works,
   what does not and why, the complete per-case table, residual opportunities, and
   handoffs to the other streams.
@@ -48,6 +52,12 @@ Status: current as of 29 August 2026.
 
 4. **Two bitwise-exact levers are worth ~1.25x on their own** (cached causal mask,
    skipping all-true padding masks) but only when `padding_ratio=0`.
+   **Corrected 29 August 2026 — the `padding_ratio=0` restriction is wrong.**
+   Under causal attention the padding key mask is dead code for *any*
+   right-padded mask, not only an all-true one, because causal masking already
+   sets `-inf` everywhere the padding mask would. Verified bitwise identical
+   (`0.000e+00`) over 4 cases x 4 padding ratios x 4 seeds. See
+   [`safe-optimization-spec.md`](safe-optimization-spec.md) section 3.
 
 5. **Reduced-precision attention internals were tested and rejected** — they pass
    correctness but are slower than plain float32 SDPA.
