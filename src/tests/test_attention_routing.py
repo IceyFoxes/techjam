@@ -53,5 +53,73 @@ class SelectRouteTests(unittest.TestCase):
                     self.assertIsInstance(select_route(is_f32, causal, kind), Route)
 
 
+try:
+    import torch
+except ImportError:  # pragma: no cover - dependency-free environments
+    torch = None
+
+
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+class ClassifyMaskTests(unittest.TestCase):
+    def test_none_is_absent(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+
+        self.assertIs(classify_mask(None), MaskKind.ABSENT)
+
+    def test_all_true_mask_is_prefix(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+
+        self.assertIs(classify_mask(torch.ones(3, 5, dtype=torch.bool)), MaskKind.PREFIX)
+
+    def test_right_padded_mask_is_prefix(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+
+        mask = torch.tensor([[True, True, False, False], [True, True, True, False]])
+        self.assertIs(classify_mask(mask), MaskKind.PREFIX)
+
+    def test_left_padded_mask_is_general(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+
+        self.assertIs(
+            classify_mask(torch.tensor([[False, True, True, True]])), MaskKind.GENERAL
+        )
+
+    def test_interior_gap_is_general(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+
+        self.assertIs(
+            classify_mask(torch.tensor([[True, False, True, False]])), MaskKind.GENERAL
+        )
+
+    def test_one_mixed_row_makes_the_batch_general(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+
+        mask = torch.tensor(
+            [[True, True, False], [True, True, False], [False, True, True]]
+        )
+        self.assertIs(classify_mask(mask), MaskKind.GENERAL)
+
+    def test_single_position_is_prefix(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+
+        self.assertIs(
+            classify_mask(torch.zeros(2, 1, dtype=torch.bool)), MaskKind.PREFIX
+        )
+
+    def test_matches_the_harness_generator(self) -> None:
+        from src.implementations.attention_routing import classify_mask
+        from torch_transformer_benchmark import TransformerConfig, generate_random_case
+
+        config = TransformerConfig(
+            batch_size=8, seq_len=16, d_model=8, num_heads=2,
+            ffn_dim=8, num_layers=1, causal=True,
+        )
+        for ratio in (0.0, 0.3, 0.9):
+            _, mask = generate_random_case(
+                config, torch.device("cpu"), torch.float32, 7, ratio, 1.0
+            )
+            self.assertIs(classify_mask(mask), MaskKind.PREFIX, msg=f"ratio={ratio}")
+
+
 if __name__ == "__main__":
     unittest.main()
