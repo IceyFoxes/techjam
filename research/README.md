@@ -9,3 +9,10 @@
   with `scaled_dot_product_attention`. Includes the finding that float16 fails the
   precision criterion for any arithmetic reassociation, which constrains all four
   streams.
+- [Framework fast paths and dispatcher](framework-fastpaths/README.md): Person 1
+  research on `torch.compile` modes, CUDA Graph suitability, numerical limits,
+  RTX 5080 measurements, and a full-tuple routing matrix for integrating the
+  four optimization streams.
+- [Benchmark records](benchmarks/README.md): preserved baseline, accepted
+  checkpoint, regression, and final runs, including validity status and
+  replacement links.
