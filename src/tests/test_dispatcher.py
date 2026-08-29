@@ -65,17 +65,40 @@ class DispatcherPolicyTests(unittest.TestCase):
                 self.assertEqual(route.backend, COMPILED_SDPA_BACKEND)
                 self.assertEqual(route.compile_mode, mode)
 
-    def test_marks_extreme_cases_unsupported(self):
+    def test_routes_extreme_cases_to_memory_safe_backend(self):
+        from src.dispatcher import EXTREME_MEMORY_BACKEND, select_route
+
+        contracts = {
+            6: {**self.VALIDATED_CONTRACT, "dtype": torch.float32},
+            14: {**self.VALIDATED_CONTRACT, "dtype": torch.float16},
+        }
+        for case_id, contract in contracts.items():
+            with self.subTest(case=case_id):
+                route = select_route(self._config(case_id), **contract)
+                self.assertEqual(route.backend, EXTREME_MEMORY_BACKEND)
+                self.assertIsNone(route.compile_mode)
+
+    def test_rejects_unsafe_extreme_contracts(self):
         from src.dispatcher import UNSUPPORTED_BACKEND, select_route
 
-        for case_id in (6, 14):
-            with self.subTest(case=case_id):
-                route = select_route(
-                    self._config(case_id),
-                    **{**self.VALIDATED_CONTRACT, "dtype": torch.float32},
-                )
+        contracts = (
+            (6, {**self.VALIDATED_CONTRACT, "dtype": torch.float16}),
+            (14, {**self.VALIDATED_CONTRACT, "dtype": torch.float32}),
+            (14, {**self.VALIDATED_CONTRACT, "dtype": torch.bfloat16}),
+            (
+                14,
+                {
+                    **self.VALIDATED_CONTRACT,
+                    "dtype": torch.float16,
+                    "device_type": "cpu",
+                    "device_capability": None,
+                },
+            ),
+        )
+        for case_id, contract in contracts:
+            with self.subTest(case=case_id, contract=contract):
+                route = select_route(self._config(case_id), **contract)
                 self.assertEqual(route.backend, UNSUPPORTED_BACKEND)
-                self.assertIn("memory-safe", route.reason)
 
     def test_accepts_ampere_and_newer_gpu_models(self):
         from src.dispatcher import COMPILED_SDPA_BACKEND, select_route
@@ -200,6 +223,34 @@ class DispatcherExecutionTests(unittest.TestCase):
                 for layer in case3.layers
             )
         )
+
+    def test_case14_uses_flash_only_attention(self):
+        from src.implementations.extreme import FlashOnlySDPASelfAttention
+
+        _, candidate = self._models(self._official_config(14))
+
+        self.assertTrue(
+            all(
+                type(layer.attention) is FlashOnlySDPASelfAttention
+                for layer in candidate.layers
+            )
+        )
+
+    def test_extreme_shape_mismatch_never_uses_reference_fallback(self):
+        from src.dispatcher import UNSUPPORTED_BACKEND
+
+        _, candidate = self._models(self._official_config(14))
+        key = self._cuda_runtime_key((1, 1024, 1024))
+        route = candidate._resolve_route(key)
+
+        self.assertEqual(route.backend, UNSUPPORTED_BACKEND)
+
+    def test_case14_allows_staged_device_and_dtype_conversions(self):
+        _, candidate = self._models(self._official_config(14))
+
+        candidate.half()
+
+        self.assertEqual(next(candidate.parameters()).dtype, torch.float16)
 
     def test_cpu_fallback_is_bitwise_reference_with_padding(self):
         baseline, candidate = self._models(self.small_config)

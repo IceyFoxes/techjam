@@ -510,12 +510,22 @@ def main() -> int:
     args = parse_args()
     official_case_id = _resolve_shape(args)
     spec = load_candidate(args.candidate)
+    device, dtype = _configure(args)
     validate_candidate_execution(
         spec,
         official_case_id,
         compile_user=args.compile_user,
+        dtype_name=args.dtype,
+        candidate_only=False,
+        input_scale=args.input_scale,
+        device_type=device.type,
+        cuda_capability=(
+            torch.cuda.get_device_capability(device)
+            if device.type == "cuda"
+            else None
+        ),
+        torch_version=torch.__version__,
     )
-    device, dtype = _configure(args)
     config = reference.TransformerConfig(
         batch_size=args.batch_size,
         seq_len=args.seq_len,
@@ -559,6 +569,13 @@ def main() -> int:
             "strict_weight_copy": strict,
             "self_compiling": spec.self_compiling,
             "unsupported_official_cases": list(spec.unsupported_official_cases),
+            "official_case_dtypes": dict(spec.official_case_dtypes),
+            "candidate_only_official_cases": list(
+                spec.candidate_only_official_cases
+            ),
+            "default_input_scale_only_cases": list(
+                spec.default_input_scale_only_cases
+            ),
         },
         "config": asdict(config),
         "official_case_id": official_case_id,

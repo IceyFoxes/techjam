@@ -111,12 +111,30 @@ CPU, older/unknown CUDA capabilities, other software contracts, non-official
 configurations, mismatched runtime shapes, unavailable compilation, and compiler
 failures use exact reference arithmetic.
 
-Cases 6 and 14 are different: dense reference execution is itself unsafe at
-their extreme sizes, so the harness rejects them before model or input
-allocation until a memory-safe backend exists. Compiled callables are exercised
-through initial compilation and one replay before caching; cached-call failures
-demote that runtime key to reference. Caches remain per model instance and are
-invalidated if parameters are loaded, moved, or converted.
+Cases 6 and 14 use eager memory-safe routes because dense reference execution is
+itself unsafe at their extreme sizes. Case 6 requires float32 and streams the
+batch through the existing strided SDPA implementation. Case 14 requires FP16
+at the official default input scale, trims each right-padded sample to its valid prefix, processes small batch
+chunks, and forces the FlashAttention SDPA backend so it cannot silently fall
+back to quadratic math attention. Both routes choose the largest conservative
+power-of-two chunk and halve it on a recoverable CUDA OOM. Unsupported extreme
+dtype contracts are rejected before input allocation; device and backend
+contracts fail before unsafe execution. BF16 and non-default
+input scales are not claimed because representative reduced-shape tests fail the
+executable elementwise tolerance.
+
+The ordinary benchmark can compare Case 6 directly. Case 14's immutable baseline
+and full-output checker remain infeasible on a 24 GB GPU, so use the candidate-only
+smoke runner to prove allocation safety and backend execution:
+
+```bash
+.venv/bin/python -m src.extreme_smoke --case 14 --dtype float16
+```
+
+Compiled callables for ordinary cases are exercised through initial compilation
+and one replay before caching; cached-call failures demote that runtime key to
+reference. Caches remain per model instance and are invalidated if parameters are
+loaded, moved, or converted.
 
 Case 8 retains the reference projection/FFN layout around SDPA because its
 packed-QKV screen was performance-neutral and failed the integration gate.
