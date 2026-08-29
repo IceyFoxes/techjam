@@ -179,6 +179,28 @@ class DispatcherExecutionTests(unittest.TestCase):
         baseline, candidate = self._models(self.small_config)
         self.assertEqual(list(baseline.state_dict()), list(candidate.state_dict()))
 
+    def test_only_case2_uses_packed_qkv_attention(self):
+        from src.implementations.sdpa import (
+            PackedQKVSDPASelfAttention,
+            StridedSDPASelfAttention,
+        )
+
+        _, case2 = self._models(self._official_config(2))
+        _, case3 = self._models(self._official_config(3))
+
+        self.assertTrue(
+            all(
+                isinstance(layer.attention, PackedQKVSDPASelfAttention)
+                for layer in case2.layers
+            )
+        )
+        self.assertTrue(
+            all(
+                type(layer.attention) is StridedSDPASelfAttention
+                for layer in case3.layers
+            )
+        )
+
     def test_cpu_fallback_is_bitwise_reference_with_padding(self):
         baseline, candidate = self._models(self.small_config)
         torch.manual_seed(5678)

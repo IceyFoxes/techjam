@@ -16,11 +16,14 @@ import torch
 import torch.nn.functional as F
 
 from torch_transformer_benchmark import (
-    BaselineSelfAttention,
     BaselineTransformer,
     TransformerConfig,
 )
 
+from src.implementations.sdpa import (
+    PackedQKVSDPASelfAttention,
+    StridedSDPASelfAttention,
+)
 from src.infra import CandidateSpec, OfficialCase, load_official_cases
 
 
@@ -212,64 +215,18 @@ def select_route(
     )
 
 
-class StridedSDPASelfAttention(BaselineSelfAttention):
-    """Reference-compatible projections around SDPA without Q/K/V copies."""
-
-    def _split_heads_view(self, x: torch.Tensor) -> torch.Tensor:
-        batch, seq_len, _ = x.shape
-        return x.view(batch, seq_len, self.num_heads, self.head_dim).transpose(1, 2)
-
-    def forward_reference(
-        self,
-        x: torch.Tensor,
-        valid_token_mask: Optional[torch.Tensor] = None,
-        causal: bool = False,
-    ) -> torch.Tensor:
-        """Execute the immutable benchmark's explicit attention arithmetic."""
-
-        return BaselineSelfAttention.forward(self, x, valid_token_mask, causal)
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        valid_token_mask: Optional[torch.Tensor] = None,
-        causal: bool = False,
-    ) -> torch.Tensor:
-        batch, seq_len, _ = x.shape
-        q = self._split_heads_view(self.q_proj(x))
-        k = self._split_heads_view(self.k_proj(x))
-        v = self._split_heads_view(self.v_proj(x))
-
-        # True means that a key participates in attention. Do not inspect mask
-        # values on the host: that would synchronize and break graph replay.
-        attn_mask = (
-            None
-            if valid_token_mask is None
-            else valid_token_mask[:, None, None, :]
-        )
-        context = F.scaled_dot_product_attention(
-            q,
-            k,
-            v,
-            attn_mask=attn_mask,
-            dropout_p=0.0,
-            is_causal=causal,
-            scale=self.scale,
-        )
-        context = context.transpose(1, 2).reshape(batch, seq_len, self.d_model)
-        output = self.out_proj(context)
-        if valid_token_mask is not None:
-            output = output.masked_fill(~valid_token_mask[..., None], 0)
-        return output
-
-
 class DispatchingTransformer(BaselineTransformer):
     """Lazy per-instance dispatcher with a strict reference fallback."""
 
     def __init__(self, config: TransformerConfig) -> None:
         super().__init__(config)
+        attention_type = (
+            PackedQKVSDPASelfAttention
+            if OFFICIAL_CASE_BY_CONFIG.get(_config_key(config)) == 2
+            else StridedSDPASelfAttention
+        )
         for layer in self.layers:
-            layer.attention = StridedSDPASelfAttention(
+            layer.attention = attention_type(
                 config.d_model,
                 config.num_heads,
             )
@@ -573,8 +530,8 @@ CANDIDATE = CandidateSpec(
     model_factory=DispatchingTransformer,
     owner="Person 1 / integrator",
     description=(
-        "Lazy twelve-case float32 CUDA dispatcher: strided-view SDPA with "
-        "shape-specific compile modes and an exact reference fallback."
+        "Lazy twelve-case float32 CUDA dispatcher: Case-2 packed QKV, "
+        "strided-view SDPA, shape-specific compilation, and exact fallback."
     ),
     self_compiling=True,
     unsupported_official_cases=(6, 14),
