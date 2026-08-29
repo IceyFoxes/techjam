@@ -17,7 +17,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch
 
 import torch_transformer_benchmark as reference
-from src.infra import CandidateSpec, load_candidate, load_official_cases
+from src.infra import (
+    CandidateSpec,
+    load_candidate,
+    load_official_cases,
+    validate_candidate_execution,
+)
 from src.infra.environment import collect_environment, collect_git, collect_gpu_state
 from src.infra.timing import (
     BASELINE,
@@ -458,6 +463,11 @@ def main() -> int:
     args = parse_args()
     official_case_id = _resolve_shape(args)
     spec = load_candidate(args.candidate)
+    validate_candidate_execution(
+        spec,
+        official_case_id,
+        compile_user=args.compile_user,
+    )
     device, dtype = _configure(args)
     config = reference.TransformerConfig(
         batch_size=args.batch_size,
@@ -500,6 +510,8 @@ def main() -> int:
             "owner": spec.owner,
             "description": spec.description,
             "strict_weight_copy": strict,
+            "self_compiling": spec.self_compiling,
+            "unsupported_official_cases": list(spec.unsupported_official_cases),
         },
         "config": asdict(config),
         "official_case_id": official_case_id,

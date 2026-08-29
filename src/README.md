@@ -91,21 +91,28 @@ match the root benchmark's behavior and defaults.
 ### Smart dispatcher
 
 The integrated selector is `src.dispatcher`. It lazily compiles its own callable
-after the harness moves weights to their final device and dtype, so do **not**
-also pass `--compile-user`:
+after the harness moves weights to their final device and dtype. The harness
+rejects `--compile-user` for this self-compiling candidate rather than nesting
+two compiler wrappers:
 
 ```bash
 .venv/bin/python -m src.benchmark \
   --candidate src.dispatcher --case 2 --device cuda --dtype float32
 ```
 
-For float32 CUDA devices with compute capability 8.0 or newer, official cases
-1-5, 7-12 use strided-view SDPA inside `reduce-overhead`; case 13 uses the same
-SDPA path with ordinary/default compilation. The complete official tuple is
-matched before selecting a route. Cases 6 and 14, non-float32 inputs, CPU,
-older/unknown CUDA devices, non-official configurations, mismatched runtime
-shapes, unavailable compilation, and first-call compiler failures use the exact
-reference arithmetic. Compiled callables are cached per model instance and
+Under the preserved RTX 5080, PyTorch 2.13.0+cu130, float32, high-matmul-precision,
+TF32-enabled contract, official cases 1-5 and 7-12 use strided-view SDPA inside
+`reduce-overhead`; case 13 uses the same SDPA path with ordinary/default
+compilation. The complete official tuple and runtime contract are matched before
+selecting a route. Non-float32 inputs, CPU, other GPU/software contracts,
+non-official configurations, mismatched runtime shapes, unavailable compilation,
+and compiler failures use exact reference arithmetic.
+
+Cases 6 and 14 are different: dense reference execution is itself unsafe at
+their extreme sizes, so the harness rejects them before model or input
+allocation until a memory-safe backend exists. Compiled callables are exercised
+through initial compilation and one replay before caching; cached-call failures
+demote that runtime key to reference. Caches remain per model instance and are
 invalidated if parameters are loaded, moved, or converted.
 
 Case 8 currently retains the reference projection/FFN layout around SDPA. Its
