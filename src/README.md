@@ -110,7 +110,7 @@ invalidated if parameters are loaded, moved, or converted.
 
 Case 8 currently retains the reference projection/FFN layout around SDPA. Its
 planned packed-QKV specialization remains a separate integration step because
-the Person 3 implementation is not yet available.
+the Person 3 packed-QKV implementation is not yet available.
 
 ### End-to-end dummy check
 
