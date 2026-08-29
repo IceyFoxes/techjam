@@ -65,27 +65,39 @@ class PackedQKVSDPASelfAttention(StridedSDPASelfAttention):
             persistent=False,
         )
         self.register_buffer("_packed_qkv_bias", torch.empty(0), persistent=False)
-        self._repack_qkv()
+        self.refresh_packed_qkv()
         self.register_load_state_dict_post_hook(self._repack_after_load)
 
     @torch.no_grad()
-    def _repack_qkv(self) -> None:
-        self._packed_qkv_weight = torch.cat(
+    def refresh_packed_qkv(self) -> None:
+        """Refresh inference caches after out-of-band parameter mutation."""
+
+        weight = torch.cat(
             (self.q_proj.weight, self.k_proj.weight, self.v_proj.weight),
             dim=0,
         ).detach()
-        self._packed_qkv_bias = torch.cat(
+        bias = torch.cat(
             (self.q_proj.bias, self.k_proj.bias, self.v_proj.bias),
             dim=0,
         ).detach()
+        if (
+            self._packed_qkv_weight.shape == weight.shape
+            and self._packed_qkv_weight.device == weight.device
+            and self._packed_qkv_weight.dtype == weight.dtype
+        ):
+            self._packed_qkv_weight.copy_(weight)
+            self._packed_qkv_bias.copy_(bias)
+        else:
+            self._packed_qkv_weight = weight
+            self._packed_qkv_bias = bias
 
     def _repack_after_load(self, module, incompatible_keys) -> None:
         del module, incompatible_keys
-        self._repack_qkv()
+        self.refresh_packed_qkv()
 
     def _apply(self, fn, recurse: bool = True):
         result = super()._apply(fn, recurse=recurse)
-        self._repack_qkv()
+        self.refresh_packed_qkv()
         return result
 
     def project_qkv(self, x: torch.Tensor):

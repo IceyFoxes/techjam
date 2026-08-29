@@ -123,7 +123,10 @@ Person 3's experimental packed-QKV route is intentionally limited to Case 2 and
 is loaded with `--candidate projections:PACKED_CASE2`. It retains the reference
 Q/K/V parameter names, rebuilds non-persistent packed buffers outside timed
 execution, and expects `--compile-user --compile-mode reduce-overhead`. It is not
-part of the dispatcher pending exact RTX 5080 validation.
+part of the dispatcher pending exact RTX 5080 validation. The official harness
+does not mutate parameters after compilation; other callers must invoke
+`refresh_packed_qkv()` on each attention module after out-of-band parameter
+mutation and before compiling or replaying inference.
 
 ### End-to-end dummy check
 

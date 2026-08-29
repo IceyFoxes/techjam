@@ -233,6 +233,32 @@ class PackedQKVCandidateTests(unittest.TestCase):
                 )
             )
 
+    def test_refresh_updates_existing_buffer_storage_after_mutation(self):
+        _, _, candidate = self._models()
+        attention = candidate.layers[0].attention
+        original_pointer = attention._packed_qkv_weight.data_ptr()
+        with torch.no_grad():
+            attention.q_proj.weight.add_(1)
+
+        attention.refresh_packed_qkv()
+
+        self.assertEqual(attention._packed_qkv_weight.data_ptr(), original_pointer)
+        self.assertTrue(
+            torch.equal(
+                attention._packed_qkv_weight[: attention.d_model],
+                attention.q_proj.weight,
+            )
+        )
+
+    def test_strict_reload_preserves_packed_buffer_storage(self):
+        baseline, _, candidate = self._models()
+        attention = candidate.layers[0].attention
+        original_pointer = attention._packed_qkv_weight.data_ptr()
+
+        candidate.load_state_dict(baseline.state_dict(), strict=True)
+
+        self.assertEqual(attention._packed_qkv_weight.data_ptr(), original_pointer)
+
     def test_packed_views_alias_storage_with_expected_strides(self):
         _, _, candidate = self._models()
         attention = candidate.layers[0].attention
