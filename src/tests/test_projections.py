@@ -166,5 +166,164 @@ class ProjectionsControlTests(unittest.TestCase):
         self.assertNotIn("fusion", description)
 
 
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+class PackedQKVCandidateTests(unittest.TestCase):
+    @staticmethod
+    def _config():
+        return ProjectionsControlTests._config()
+
+    @classmethod
+    def _models(cls):
+        from src.dispatcher import DispatchingTransformer
+        from src.implementations.projections import Case2PackedQKVTransformer
+        from torch_transformer_benchmark import (
+            BaselineTransformer,
+            copy_model_weights,
+        )
+
+        config = cls._config()
+        baseline = BaselineTransformer(config).eval()
+        control = DispatchingTransformer(config).eval()
+        candidate = Case2PackedQKVTransformer(config).eval()
+        copy_model_weights(baseline, control, strict=True)
+        copy_model_weights(baseline, candidate, strict=True)
+        return baseline, control, candidate
+
+    def test_preserves_state_dict_and_packs_exact_parameter_rows(self):
+        baseline, _, candidate = self._models()
+
+        self.assertEqual(list(baseline.state_dict()), list(candidate.state_dict()))
+        self.assertFalse(
+            any("_packed_qkv" in name for name in candidate.state_dict())
+        )
+        for layer in candidate.layers:
+            attention = layer.attention
+            expected_weight = torch.cat(
+                (
+                    attention.q_proj.weight,
+                    attention.k_proj.weight,
+                    attention.v_proj.weight,
+                ),
+                dim=0,
+            )
+            expected_bias = torch.cat(
+                (
+                    attention.q_proj.bias,
+                    attention.k_proj.bias,
+                    attention.v_proj.bias,
+                ),
+                dim=0,
+            )
+            self.assertTrue(
+                torch.equal(attention._packed_qkv_weight, expected_weight)
+            )
+            self.assertTrue(torch.equal(attention._packed_qkv_bias, expected_bias))
+
+    def test_rebuilds_packed_buffers_after_dtype_conversion(self):
+        _, _, candidate = self._models()
+        candidate = candidate.to(dtype=torch.float64)
+
+        for layer in candidate.layers:
+            attention = layer.attention
+            self.assertEqual(attention._packed_qkv_weight.dtype, torch.float64)
+            self.assertTrue(
+                torch.equal(
+                    attention._packed_qkv_weight[: attention.d_model],
+                    attention.q_proj.weight,
+                )
+            )
+
+    def test_refresh_updates_existing_buffer_storage_after_mutation(self):
+        _, _, candidate = self._models()
+        attention = candidate.layers[0].attention
+        original_pointer = attention._packed_qkv_weight.data_ptr()
+        with torch.no_grad():
+            attention.q_proj.weight.add_(1)
+
+        attention.refresh_packed_qkv()
+
+        self.assertEqual(attention._packed_qkv_weight.data_ptr(), original_pointer)
+        self.assertTrue(
+            torch.equal(
+                attention._packed_qkv_weight[: attention.d_model],
+                attention.q_proj.weight,
+            )
+        )
+
+    def test_strict_reload_preserves_packed_buffer_storage(self):
+        baseline, _, candidate = self._models()
+        attention = candidate.layers[0].attention
+        original_pointer = attention._packed_qkv_weight.data_ptr()
+
+        candidate.load_state_dict(baseline.state_dict(), strict=True)
+
+        self.assertEqual(attention._packed_qkv_weight.data_ptr(), original_pointer)
+
+    def test_packed_views_alias_storage_with_expected_strides(self):
+        _, _, candidate = self._models()
+        attention = candidate.layers[0].attention
+        x = torch.randn(2, 8, 16)
+        with torch.inference_mode():
+            q, k, v = attention.project_qkv(x)
+
+        self.assertEqual(q.shape, (2, 4, 8, 4))
+        self.assertEqual(q.stride(), (384, 4, 48, 1))
+        self.assertEqual(k.stride(), q.stride())
+        self.assertEqual(v.stride(), q.stride())
+        self.assertEqual(
+            (q.storage_offset(), k.storage_offset(), v.storage_offset()),
+            (0, 16, 32),
+        )
+        self.assertEqual(
+            q.untyped_storage().data_ptr(),
+            k.untyped_storage().data_ptr(),
+        )
+        self.assertEqual(
+            q.untyped_storage().data_ptr(),
+            v.untyped_storage().data_ptr(),
+        )
+
+    def test_matches_current_sdpa_control_with_padding(self):
+        _, control, candidate = self._models()
+        torch.manual_seed(1234)
+        x = torch.randn(2, 8, 16)
+        mask = torch.tensor(
+            [
+                [True, True, True, True, True, True, True, True],
+                [True, True, True, False, False, False, False, False],
+            ]
+        )
+        with torch.inference_mode():
+            expected = control._forward_sdpa(x, mask)
+            actual = candidate(x, mask)
+
+        self.assertTrue(torch.equal(expected, actual))
+        self.assertTrue(torch.equal(actual[~mask], torch.zeros_like(actual[~mask])))
+
+    def test_gradient_enabled_path_ignores_inference_cache(self):
+        _, _, candidate = self._models()
+        for layer in candidate.layers:
+            layer.attention._packed_qkv_weight.fill_(float("nan"))
+        x = torch.randn(2, 8, 16, requires_grad=True)
+
+        actual = candidate(x, None)
+        actual.sum().backward()
+
+        self.assertTrue(torch.isfinite(actual).all())
+        self.assertIsNotNone(x.grad)
+
+    def test_candidate_contract_is_case2_only(self):
+        from src.implementations.projections import PACKED_CASE2
+
+        PACKED_CASE2.validate()
+        self.assertEqual(PACKED_CASE2.name, "case2-packed-qkv")
+        self.assertFalse(PACKED_CASE2.self_compiling)
+        self.assertNotIn(2, PACKED_CASE2.unsupported_official_cases)
+        self.assertEqual(
+            set(PACKED_CASE2.unsupported_official_cases),
+            set(range(1, 15)) - {2},
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
