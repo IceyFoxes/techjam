@@ -103,13 +103,13 @@ two compiler wrappers:
 On CUDA GPUs with compute capability 8.0 or newer, under the PyTorch
 2.13.0+cu130, float32, high-matmul-precision, TF32-enabled contract, official
 cases 1-5 and 7-12 use strided-view SDPA inside `reduce-overhead`; case 13 uses
-the same SDPA path with ordinary/default compilation. Performance evidence is
-currently specific to the RTX 5080; other eligible GPUs may produce different
-speedups. The complete official tuple and runtime contract are matched before
-selecting a route. Non-float32 inputs, CPU, older/unknown CUDA capabilities,
-other software contracts, non-official configurations, mismatched runtime
-shapes, unavailable compilation, and compiler failures use exact reference
-arithmetic.
+the same SDPA path with ordinary/default compilation. Case 2 additionally packs
+the Q/K/V projections. Performance evidence covers the RTX 4050 and RTX 5080;
+other eligible GPUs may produce different speedups. The complete official tuple
+and runtime contract are matched before selecting a route. Non-float32 inputs,
+CPU, older/unknown CUDA capabilities, other software contracts, non-official
+configurations, mismatched runtime shapes, unavailable compilation, and compiler
+failures use exact reference arithmetic.
 
 Cases 6 and 14 are different: dense reference execution is itself unsafe at
 their extreme sizes, so the harness rejects them before model or input
@@ -118,18 +118,16 @@ through initial compilation and one replay before caching; cached-call failures
 demote that runtime key to reference. Caches remain per model instance and are
 invalidated if parameters are loaded, moved, or converted.
 
-Case 8 currently retains the reference projection/FFN layout around SDPA. Its
-planned packed-QKV specialization remains a separate integration step because
-the Person 3 packed-QKV implementation is not yet available.
+Case 8 retains the reference projection/FFN layout around SDPA because its
+packed-QKV screen was performance-neutral and failed the integration gate.
 
-Person 3's experimental packed-QKV route is intentionally limited to Case 2 and
-is loaded with `--candidate projections:PACKED_CASE2`. It retains the reference
-Q/K/V parameter names, rebuilds non-persistent packed buffers outside timed
-execution, and expects `--compile-user --compile-mode reduce-overhead`. It is not
-part of the dispatcher pending exact RTX 5080 validation. The official harness
-does not mutate parameters after compilation; other callers must invoke
-`refresh_packed_qkv()` on each attention module after out-of-band parameter
-mutation and before compiling or replaying inference.
+The dispatcher uses Person 3's packed-QKV route only for official Case 2. The
+standalone `--candidate projections:PACKED_CASE2` selector remains available for
+isolated A/B measurements. Both routes retain the reference Q/K/V parameter
+names and rebuild non-persistent packed buffers outside timed execution. The
+official harness does not mutate parameters after compilation; other callers
+must invoke `refresh_packed_qkv()` on each attention module after out-of-band
+parameter mutation and before compiling or replaying inference.
 
 ### End-to-end dummy check
 
