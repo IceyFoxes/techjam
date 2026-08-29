@@ -74,6 +74,36 @@ def collect_environment(torch_module: Any, device: Any) -> Dict[str, Any]:
     }
 
 
+def collect_gpu_state(device: Any) -> Optional[Dict[str, Any]]:
+    """Sample clock, power and throttle state at the moment of measurement."""
+    if getattr(device, "type", None) != "cuda":
+        return None
+
+    fields = [
+        "clocks.sm",
+        "clocks.mem",
+        "power.draw",
+        "power.limit",
+        "temperature.gpu",
+        "clocks_throttle_reasons.active",
+    ]
+    output = _command_output(
+        [
+            "nvidia-smi",
+            f"--query-gpu={','.join(fields)}",
+            "--format=csv,noheader,nounits",
+            f"--id={device.index or 0}",
+        ]
+    )
+    if not output:
+        return None
+
+    values = [value.strip() for value in output.split(",")]
+    if len(values) != len(fields):
+        return None
+    return dict(zip(fields, values))
+
+
 def collect_git() -> Dict[str, Any]:
     commit = _command_output(["git", "rev-parse", "HEAD"])
     status = _command_output(["git", "status", "--short"])
