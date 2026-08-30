@@ -74,6 +74,7 @@ def poly_linear_attention(
     causal_diag: Optional[Callable] = None,
     skip_prefix_chunks: bool = True,
     quad_shadow: bool = True,
+    small_state_shadows: bool = True,
 ) -> torch.Tensor:
     """Causal attention with a degree-2 polynomial feature map.
 
@@ -109,7 +110,6 @@ def poly_linear_attention(
     s_const = torch.zeros(M, 1, D, device=dev, dtype=state_dtype)
     s_lin = torch.zeros(M, D, D, device=dev, dtype=state_dtype)
     s_quad = torch.zeros(M, D * D, D, device=dev, dtype=state_dtype)
-    z_const = torch.zeros(M, 1, 1, device=dev, dtype=state_dtype)
     z_lin = torch.zeros(M, D, 1, device=dev, dtype=state_dtype)
     # The denominator's quadratic term does NOT need a d^2 feature state.
     gram = torch.zeros(M, D, D, device=dev, dtype=state_dtype)
@@ -128,6 +128,17 @@ def poly_linear_attention(
         else None
     )
     s_quad_view = s_quad if s_quad_shadow is None else s_quad_shadow
+
+    # s_lin, gram and z_lin were converted float32 -> compute dtype on EVERY
+    # chunk, at every use site: part of 3326 conversion launches worth ~20.5 ms
+    # in the profile. Holding a shadow refreshed once per fold replaces three
+    # conversions per chunk with three copies. Like s_quad's shadow these are
+    # rounded copies of exact float32 masters, not accumulators.
+    _use_small_shadows = small_state_shadows and cdt != state_dtype
+    if _use_small_shadows:
+        s_lin_h = torch.zeros(M, D, D, device=dev, dtype=cdt)
+        gram_h = torch.zeros(M, D, D, device=dev, dtype=cdt)
+        z_lin_h = torch.zeros(M, D, 1, device=dev, dtype=cdt)
 
     # Only the dense path needs the mask. The tiled kernel masks the diagonal
     # tile in registers and never visits the tiles above it.
@@ -161,16 +172,28 @@ def poly_linear_attention(
                 den = torch.zeros(M, C, 1, device=dev, dtype=state_dtype)
             else:
                 af = a.to(cdt)
+                if _use_small_shadows:
+                    s_lin_c, gram_c, z_lin_c = s_lin_h, gram_h, z_lin_h
+                else:
+                    # The pre-F5 path: reconvert at every use site. Kept so
+                    # it can run as a second arm in the same session.
+                    s_lin_c = s_lin.to(cdt)
+                    gram_c = gram.to(cdt)
+                    z_lin_c = z_lin.to(cdt)
                 num = (
                     c0 * s_const.expand(M, C, D)
-                    + c1 * (af @ s_lin.to(cdt)).to(state_dtype)
+                    + c1 * (af @ s_lin_c).to(state_dtype)
                 )
                 den = (
-                    c0 * z_const.expand(M, C, 1)
-                    + c1 * (af @ z_lin.to(cdt)).to(state_dtype)
+                    # z_const is just the number of preceding tokens, t0. It
+                    # was a device tensor incremented by float(C) each chunk,
+                    # which cost a kernel launch per chunk to recompute a
+                    # value the loop variable already holds.
+                    c0 * float(t0)
+                    + c1 * (af @ z_lin_c).to(state_dtype)
                 )
                 den = den + c2 * (
-                    (af @ gram.to(cdt)) * af
+                    (af @ gram_c) * af
                 ).sum(-1, keepdim=True).to(state_dtype)
                 if quad_apply is None:
                     aq = phi2(af)
@@ -207,7 +230,6 @@ def poly_linear_attention(
         bf = b.to(cdt)
         vfc = vc.to(cdt)
         s_const += vfc.sum(1, keepdim=True).to(state_dtype)
-        z_const += float(C)
         s_lin += (bf.transpose(-2, -1) @ vfc).to(state_dtype)
         z_lin += bf.sum(1).unsqueeze(-1).to(state_dtype)
         gram += (bf.transpose(-2, -1) @ bf).to(state_dtype)
@@ -217,6 +239,11 @@ def poly_linear_attention(
             del bq
         else:
             quad_update(bf, vfc, s_quad, shadow=s_quad_shadow)
+
+        if _use_small_shadows:
+            s_lin_h.copy_(s_lin)
+            gram_h.copy_(gram)
+            z_lin_h.copy_(z_lin)
 
     # Early tokens attend to very few keys, where a relative weight error is not
     # damped by averaging, so the max error lives there. Recomputing the first
