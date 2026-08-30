@@ -5,6 +5,52 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx4060-stage0/`](2026-08-30-rtx4060-stage0/README.md): Person 2
+  Phase 2 **Stage 0**, accepted. **1.439x over the Phase 1 kernel (328.1 ->
+  228.0 ms at B=2), and 6.135x over exact Flash**, with peak VRAM overhead down
+  from +67.1 to +61.4 MiB and zero failed elements at all six oracle points. The
+  exact diagonal block fell from 25-35% of the path to 5.0%. Records six
+  individually A/B'd fixes including two rejections, and two findings that
+  changed decisions: **`SIGMA_CEILING` was lowered from 0.45 to 0.40** because
+  Stage 0's own numerics moved the accuracy boundary, and **Design B (the
+  persistent-slab scan) is rejected with evidence** because the feature-map
+  kernels now run at 24-27 TFLOPS against Flash's realised 28 and are no longer
+  traffic-limited.
+
+- [`2026-08-30-rtx4060-d496539/`](2026-08-30-rtx4060-d496539/README.md): Person 2
+  Phase 2 task **F0**, the noise floor. Measures how large a difference this
+  machine can resolve, using an A/A control — the same callable timed twice as
+  if it were two variants. **Working floor 1.03x**: identical code reproduced to
+  0.6% cool and 2.7% warm. Establishes that the Stage 0 and Stage 1 gates are
+  decidable, that F6 is not measurable at all, and that **both arms of every A/B
+  must run in the same session** — identical code drifted 17.5% between sessions
+  minutes apart. The speedups it reports are a by-product and are **not** a
+  performance claim; they disagree with each other by 17%.
+- [`2026-08-30-rtx4060-6dc9639/`](2026-08-30-rtx4060-6dc9639/README.md): Person 2
+  kernel-level **profile** of the Phase 1 polynomial path, taken to decide what
+  Phase 2 should target. The two Triton kernels are 51% of GPU time and the
+  PyTorch glue around them is the other half; the exact diagonal block is 25-35%
+  on its own and computes a full `C x C` score matrix it then masks in half.
+  **Its millisecond column is attribution, not latency** — four identical runs
+  spread 2.17x while the kernels' share held at 51-55%, which is the evidence
+  behind the Phase 2 spec's blocking noise-floor task. Also records two negative
+  results: no tile schedule outside the shipped autotune space is materially
+  faster, and doing the causal skip by sub-blocking in PyTorch is 2.7x slower
+  than not doing it.
+- [`2026-08-30-rtx4060-poly/`](2026-08-30-rtx4060-poly/README.md): Person 2 fused
+  polynomial attention kernel, Phase 1 acceptance. **4.31x at the real chunk
+  shape (B=2, N=100000): 328.1 ms against 1414.0 ms exact flash**, with peak-VRAM
+  overhead cut from +6773 MiB to +67 MiB. Zero failed elements against the dense reference at N=4096/8192 and
+  against an exact-flash oracle to N=100000 (0 / 102,400,000). Includes the
+  sigma-guard calibration sweep. Attention core only; case 14 cannot run end to
+  end on an 8 GiB card, and the route is an approximation guarded at runtime.
+- [`2026-08-30-rtx5080-8567f3f-sm120/`](2026-08-30-rtx5080-8567f3f-sm120/README.md):
+  PR #16 Case 14 RTX 5080 promotion. The measured one-kernel policy passes the
+  dense N=8192 and Flash N=100000 oracles with zero failures and completes the
+  official full shape at 11.407-14.545 s cold. A post-merge, order-reversed
+  bracket measured **1.462-1.530x** over exact Flash, with equal 13,931.858 MiB
+  peak allocation. Records full-fusion and one-kernel rejections, empty-cache
+  cold/warm runs, and 200 passing tests.
 - [`2026-08-30-rtx5080-fecf994/#case-6-full-official-comparison`](2026-08-30-rtx5080-fecf994/README.md#case-6-full-official-comparison):
   official Case 6 float32 comparison on the RTX 5080. The memory-safe dispatcher
   passes 5/5 seeds with zero failed elements, improves latency from 354.862 ms
@@ -56,6 +102,14 @@ unless promoted to a checkpoint or needed to document a regression.
   compiler-mode checkpoints and rejected numerical routes on an RTX 5080.
 
 ## Invalid, Stale, or Superseded Runs
+
+- 30 August 2026: the `attention-core.json` figure of **342.4 ms / 2.12x** inside
+  [`2026-08-30-rtx4060-poly/`](2026-08-30-rtx4060-poly/README.md) is
+  **superseded**. It used contiguous inputs where the real module supplies
+  strided views, it included a 3-D SDPA fallback costing 2.4 GiB and ~72 ms, and
+  its variants were timed back to back on a thermally throttling laptop GPU.
+  Replaced by `attention-core-v2.json` (B=1) and `attention-core-b2.json` (B=2)
+  in the same directory. The JSON is retained as history; do not quote it.
 
 - 29 August 2026: the RTX 4050 Case-3 packed-QKV rejection in
   [`packed-qkv-exploration.md`](../projections-ffn-fusion/packed-qkv-exploration.md)

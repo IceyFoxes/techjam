@@ -1,0 +1,4 @@
+agreement  max|dnum| = 0.0078125  max|dden| = 0.0
+full C x C  (today)                 0.4883 ms/chunk   ->    95.7 ms over 196 chunks
+lower-triangular tiles, BK=128      1.3383 ms/chunk   ->   262.3 ms over 196 chunks
+tile count: full=16, causal=10  (62%)

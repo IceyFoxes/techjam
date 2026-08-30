@@ -27,7 +27,7 @@ from src.implementations.sdpa import (
 )
 from src.implementations.extreme import (
     CASE_14_CONFIG,
-    FlashOnlySDPASelfAttention,
+    PolyOrFlashSelfAttention,
     choose_batch_chunk_size,
     forward_batch_chunks,
     forward_prefix_chunks,
@@ -270,7 +270,7 @@ class DispatchingTransformer(BaselineTransformer):
         super().__init__(config)
         case_id = OFFICIAL_CASE_BY_CONFIG.get(_config_key(config))
         if _config_key(config) == CASE_14_CONFIG:
-            attention_type = FlashOnlySDPASelfAttention
+            attention_type = PolyOrFlashSelfAttention
         elif case_id in PACKED_QKV_CASES:
             attention_type = PackedQKVSDPASelfAttention
         else:

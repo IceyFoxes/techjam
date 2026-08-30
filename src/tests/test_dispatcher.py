@@ -225,14 +225,14 @@ class DispatcherExecutionTests(unittest.TestCase):
                     )
                 )
 
-    def test_case14_uses_flash_only_attention(self):
-        from src.implementations.extreme import FlashOnlySDPASelfAttention
+    def test_case14_uses_guarded_polynomial_attention(self):
+        from src.implementations.extreme import PolyOrFlashSelfAttention
 
         _, candidate = self._models(self._official_config(14))
 
         self.assertTrue(
             all(
-                type(layer.attention) is FlashOnlySDPASelfAttention
+                type(layer.attention) is PolyOrFlashSelfAttention
                 for layer in candidate.layers
             )
         )

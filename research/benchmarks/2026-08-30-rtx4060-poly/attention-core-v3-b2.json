@@ -1,0 +1,49 @@
+{
+  "acceptance_threshold_speedup": 2.0,
+  "config": {
+    "batch": 2,
+    "dtype": "float16",
+    "head_dim": 64,
+    "heads": 16,
+    "layers": 1,
+    "n": 100000,
+    "reps": 4
+  },
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 832748457984,
+      "path": "/home/izo/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU"
+    },
+    "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python": "3.12.14",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "c97b2c4fd923006d289a0eacb4c529b01ad5146c",
+    "dirty": true,
+    "status": "M src/implementations/poly_reference.py\n?? research/benchmarks/2026-08-30-rtx4060-poly/attention-core-v3-b1.json"
+  },
+  "results": {
+    "accepted": true,
+    "beats_pytorch_poly": true,
+    "exact_flash_ms": 1414.0373610007373,
+    "peak_mib": {
+      "exact_flash": 403.5830078125,
+      "poly_overhead": 67.12060546875,
+      "poly_triton": 470.70361328125
+    },
+    "poly_pytorch_ms": 845.1224969994655,
+    "poly_triton_ms": 328.07101199978206,
+    "speedup_vs_exact": 4.31015636639569,
+    "speedup_vs_pytorch_poly": 2.576035267023308
+  },
+  "schema_version": 1
+}
