@@ -19,31 +19,50 @@ from typing import Optional
 import torch
 
 
-# Measured 30 August 2026. Swept by scaling the q_proj/k_proj weights of both
-# the reference and the candidate (``src/validate_poly.py --scale-qk-weights``)
-# and recording where the official criterion first fails, at N=8192 against the
+# Measured 30 August 2026, and RE-measured after Stage 0 (commit f3048dd), which
+# moved the boundary. Swept by scaling the q_proj/k_proj weights of both the
+# reference and the candidate (``src/validate_poly.py --scale-qk-weights``) and
+# recording where the official criterion first fails, at N=8192 against the
 # dense reference:
 #
-#     sigma 0.3339  0 failures      <- the benchmark's own operating point
-#     sigma 0.4040  0 failures
-#     sigma 0.4808  0 failures      <- largest verified pass
-#     sigma 0.5217  21 failures     <- first observed failure
-#     sigma 0.5642  308 failures
-#     sigma 0.6544  9,566 failures
-#     sigma 0.7512  56,801 failures
+#     sigma   before Stage 0     after Stage 0
+#     0.3339  0 failures         0 failures     <- the benchmark's operating point
+#     0.3681  --                 0 failures
+#     0.4040  0 failures         0 failures
+#     0.4188  --                 0 failures     <- largest CLEAN pass
+#     0.4416  --                 1 failure      <- first failure
+#     0.4649  --                 0 failures     <- see the non-monotonicity note
+#     0.4808  0 failures         1 failure
+#     0.5217  21 failures        19 failures
+#     0.5642  308 failures       319 failures
+#     0.6544  9,566 failures     9,482 failures
+#     0.7512  56,801 failures    56,758 failures
 #
-# 0.45 sits 35% above the operating point -- far outside its seed-to-seed spread
-# of 0.3327 to 0.3343, so it cannot cause a spurious fallback -- and below 0.4808,
-# so the route never runs in the untested band between the last pass and the
-# first failure.
+# **The ceiling was lowered from 0.45 to 0.40 because of this sweep.** Stage 0's
+# causal-tiled diagonal block computes exp in float32 where the dense block
+# rounded scores to float16, and z_const became a Python scalar. Those shifted
+# the boundary down: sigma 0.4808 passed before Stage 0 and now fails. A ceiling
+# of 0.45 would therefore admit values that fail, which is precisely what the
+# guard exists to prevent.
 #
-# The provisional value before this sweep was 0.60, which would have permitted
-# sigma values that fail. A guessed ceiling is weaker protection than it looks.
+# Near the boundary the failure count is not monotonic -- 0.4416 fails with one
+# element in 8,388,608 while 0.4649 passes -- because a handful of elements sit
+# exactly on the criterion. That is a reason to set the ceiling below the
+# largest CLEAN pass rather than to interpolate a crossing point.
 #
-# Note this is conservative for the target shape: it was measured at N=8192,
-# and attention contributes less to the residual stream as N grows, so the
-# tolerance at N=100000 is more forgiving, not less.
-SIGMA_CEILING = 0.45
+# 0.40 sits below the largest clean pass (0.4188) and about 20% above the
+# operating point, whose seed-to-seed spread is 0.3327 to 0.3343, so it can
+# neither admit a failing configuration nor cause a spurious fallback.
+#
+# The provisional value before any sweep was 0.60, which would have permitted
+# sigma values that fail. A guessed ceiling is weaker protection than it looks --
+# and so, it turns out, is a measured one that is not re-measured when the
+# numerics change.
+#
+# Note this remains conservative for the target shape: it was measured at
+# N=8192, and attention contributes less to the residual stream as N grows, so
+# the tolerance at N=100000 is more forgiving, not less.
+SIGMA_CEILING = 0.40
 
 
 def estimate_sigma(

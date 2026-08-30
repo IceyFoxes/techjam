@@ -83,7 +83,11 @@ class PolyGuardTests(unittest.TestCase):
         """
         from src.implementations.poly_guard import SIGMA_CEILING, poly_is_safe
 
-        self.assertLessEqual(SIGMA_CEILING, 0.4808)
+        # 0.4188 is the largest CLEAN pass measured after Stage 0. The
+        # previous bound here was 0.4808, which passed before Stage 0's
+        # numerics changes and fails after them -- so this assertion is what
+        # would have caught a stale ceiling.
+        self.assertLessEqual(SIGMA_CEILING, 0.4188)
         # Everything at or beyond the first observed failure must be rejected.
         for failing in (0.5217, 0.5642, 0.6544, 0.7512):
             self.assertFalse(poly_is_safe(failing), f"sigma {failing} must fall back")
