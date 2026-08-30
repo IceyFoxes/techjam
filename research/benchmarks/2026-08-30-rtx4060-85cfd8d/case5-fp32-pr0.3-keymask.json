@@ -1,0 +1,288 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.0010364055633544922,
+    "max_relative_error": 617.0989379882812,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 10485760,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0009515285491943359,
+        "max_relative_error": 119.76615142822266,
+        "mean_abs_error": 8.018237713258713e-05,
+        "optimized_at_worst": -1.9841241836547852,
+        "passed": true,
+        "reference_at_worst": -1.9831726551055908,
+        "seed": 1234,
+        "total_elements": 2097152,
+        "trial": 1,
+        "worst_index": [
+          37,
+          1,
+          4
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0009961724281311035,
+        "max_relative_error": 57.0790901184082,
+        "mean_abs_error": 8.146090840455145e-05,
+        "optimized_at_worst": -0.9782941341400146,
+        "passed": true,
+        "reference_at_worst": -0.9792903065681458,
+        "seed": 1235,
+        "total_elements": 2097152,
+        "trial": 2,
+        "worst_index": [
+          52,
+          1,
+          66
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.000984877347946167,
+        "max_relative_error": 617.0989379882812,
+        "mean_abs_error": 8.162808080669492e-05,
+        "optimized_at_worst": -0.05085891857743263,
+        "passed": true,
+        "reference_at_worst": -0.0518437959253788,
+        "seed": 1236,
+        "total_elements": 2097152,
+        "trial": 3,
+        "worst_index": [
+          86,
+          2,
+          104
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0010364055633544922,
+        "max_relative_error": 492.2171630859375,
+        "mean_abs_error": 8.07906617410481e-05,
+        "optimized_at_worst": -1.1499098539352417,
+        "passed": true,
+        "reference_at_worst": -1.1488734483718872,
+        "seed": 1237,
+        "total_elements": 2097152,
+        "trial": 4,
+        "worst_index": [
+          38,
+          2,
+          109
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0010202527046203613,
+        "max_relative_error": 71.24829864501953,
+        "mean_abs_error": 8.052674820646644e-05,
+        "optimized_at_worst": 0.7373452186584473,
+        "passed": true,
+        "reference_at_worst": 0.7363249659538269,
+        "seed": 1238,
+        "total_elements": 2097152,
+        "trial": 5,
+        "worst_index": [
+          126,
+          1,
+          7
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "description": "Mask-routed SDPA retaining the broadcast key mask; A/B control.",
+    "name": "attention-keymask",
+    "owner": "Person 2",
+    "selector": "attention:KEYMASK_CANDIDATE",
+    "self_compiling": false,
+    "strict_weight_copy": true,
+    "unsupported_official_cases": []
+  },
+  "command": "/home/izo/techjam/.venv/bin/python /home/izo/techjam/src/benchmark.py --candidate attention:KEYMASK_CANDIDATE --device cuda --dtype float32 --case 5 --padding-ratio 0.3 --repeats 40 --settle-seconds 20 --output research/benchmarks/2026-08-30-rtx4060-85cfd8d/case5-fp32-pr0.3-keymask.json",
+  "config": {
+    "batch_size": 128,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 4,
+    "num_layers": 4,
+    "seq_len": 128
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 832780009472,
+      "path": "/home/izo/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU"
+    },
+    "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python": "3.12.14",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "85cfd8d3177d2e59f84cf98183731683e7e0ac9b",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-30-rtx4060-85cfd8d/"
+  },
+  "input_scale": 1.0,
+  "nvtx_enabled": false,
+  "official_case_id": 5,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.3,
+  "performance": {
+    "baseline": {
+      "mean_ms": 12.455398440361023,
+      "median_ms": 12.324352264404297,
+      "min_ms": 12.112128257751465,
+      "p90_ms": 12.69401569366455,
+      "samples_ms": [
+        12.705535888671875,
+        12.69273567199707,
+        12.286975860595703,
+        12.247808456420898,
+        12.317695617675781,
+        12.254976272583008,
+        12.251903533935547,
+        12.176383972167969,
+        12.320256233215332,
+        12.613120079040527,
+        12.231424331665039,
+        12.419839859008789,
+        12.230912208557129,
+        12.399359703063965,
+        12.243200302124023,
+        12.493311882019043,
+        12.402688026428223,
+        12.876799583435059,
+        12.163583755493164,
+        12.392959594726562,
+        12.324352264404297,
+        14.655488014221191,
+        13.863936424255371,
+        12.172287940979004,
+        12.285951614379883,
+        12.3755521774292,
+        12.293375968933105,
+        12.524800300598145,
+        12.50175952911377,
+        12.580608367919922,
+        12.428288459777832,
+        12.40601634979248,
+        12.24499225616455,
+        12.324352264404297,
+        12.1976318359375,
+        12.192000389099121,
+        12.112128257751465,
+        12.389632225036621,
+        12.232959747314453,
+        12.388352394104004
+      ],
+      "tokens_per_second": 1329400.4949307514
+    },
+    "block_size": 4,
+    "candidate": {
+      "mean_ms": 5.276601588726043,
+      "median_ms": 5.019391775131226,
+      "min_ms": 4.50764799118042,
+      "p90_ms": 5.915673732757568,
+      "samples_ms": [
+        4.9791998863220215,
+        4.588031768798828,
+        4.50764799118042,
+        4.713727951049805,
+        4.839168071746826,
+        5.232895851135254,
+        4.881919860839844,
+        5.197311878204346,
+        5.5662078857421875,
+        5.097472190856934,
+        6.058239936828613,
+        4.876031875610352,
+        5.4323201179504395,
+        5.458943843841553,
+        5.467648029327393,
+        5.0675201416015625,
+        5.3488640785217285,
+        4.95743989944458,
+        4.923903942108154,
+        4.92083215713501,
+        5.912320137023926,
+        5.044223785400391,
+        4.976895809173584,
+        5.192192077636719,
+        5.6645121574401855,
+        4.543231964111328,
+        5.4817280769348145,
+        4.9945597648620605,
+        7.062016010284424,
+        4.8058881759643555,
+        5.896448135375977,
+        4.887296199798584,
+        4.773119926452637,
+        4.832511901855469,
+        4.778751850128174,
+        4.5946879386901855,
+        9.202688217163086,
+        5.437439918518066,
+        5.945856094360352,
+        4.922368049621582
+      ],
+      "tokens_per_second": 3264140.5042688986
+    },
+    "gpu_state": {
+      "clocks.mem": "8001",
+      "clocks.sm": "2400",
+      "clocks_throttle_reasons.active": "0x0000000000000400",
+      "power.draw": "27.21",
+      "power.limit": "[N/A]",
+      "temperature.gpu": "87"
+    },
+    "memory": {
+      "baseline": {
+        "before_allocated_bytes": 20113408,
+        "before_reserved_bytes": 197132288,
+        "incremental_peak_allocated_bytes": 134266880,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 154380288,
+        "peak_reserved_bytes": 197132288
+      },
+      "candidate": {
+        "before_allocated_bytes": 20113408,
+        "before_reserved_bytes": 197132288,
+        "incremental_peak_allocated_bytes": 67125248,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 87238656,
+        "peak_reserved_bytes": 197132288
+      }
+    },
+    "noise_floor_ratio": 0.11452791983620864,
+    "repeats": 40,
+    "settle_seconds": 20.0,
+    "significant": true,
+    "speedup": 2.4553477426220813,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "paired"
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-29T17:00:43.562052+00:00"
+}

@@ -145,3 +145,102 @@ memory-safe at their shapes.
   `6bde871dd65051fcace36971b27a86771365ba1e`, symbols
   `TransformerConfig`, `BaselineTransformer.forward`, `maybe_compile`, and
   `compare_outputs`, accessed 29 August 2026.
+
+### Person 2 attention — mask route (added 30 August 2026)
+
+`StridedSDPASelfAttention` and `PackedQKVSDPASelfAttention` in
+[`../../src/implementations/sdpa.py`](../../src/implementations/sdpa.py) always
+supply the broadcast key mask. That is correct, but **under causal attention the
+mask is dead code**: causal masking already writes `-inf` everywhere a
+right-padded key mask would, and the reference zeroes the invalid query rows
+that genuinely differ. Verified bitwise (`0.000e+00`) across 4 cases x 4 padding
+ratios x 4 seeds, and pinned by
+[`../../src/tests/test_padding_mask_redundancy.py`](../../src/tests/test_padding_mask_redundancy.py).
+
+Dropping it is also faster. In-process A/B: ahead in **24 of 24** comparisons
+(12 in-scope cases x `padding_ratio` 0.0/0.3). Through `src.benchmark`: ahead in
+**20**, tied in **4**, behind in **none**. Evidence:
+[`../benchmarks/2026-08-30-rtx4060-85cfd8d/`](../benchmarks/2026-08-30-rtx4060-85cfd8d/README.md).
+
+The proposed upstream change is one expression:
+
+```python
+# src/implementations/sdpa.py, StridedSDPASelfAttention.forward
+attn_mask = (
+    None
+    if valid_token_mask is None or self.drop_key_mask
+    else valid_token_mask[:, None, None, :]
+)
+```
+
+with `drop_key_mask` defaulting to `False` and set by the dispatcher. **It is
+Person 1's call whether to take it**; it is not applied here.
+
+#### The constraint that matters
+
+`sdpa.py` correctly refuses to inspect mask values on the host — that
+synchronizes and breaks graph replay, and cases 1-12 run under
+`reduce-overhead`. So the drop-mask route is only safe to select if the decision
+is made **outside** the captured region:
+
+- `drop_key_mask` is a static property of `(causal, mask-kind)`. For every
+  disclosed case `causal` is true, and `generate_random_case` emits right-padded
+  masks exclusively, so the value is constant per case and can be set at model
+  construction — **no per-forward sync at all** in the dispatcher path.
+- If a runtime check is ever wanted, `classify_mask` and `select_route` are
+  importable from
+  [`../../src/implementations/attention_routing.py`](../../src/implementations/attention_routing.py).
+  `classify_mask` performs exactly one host sync and must be called above the
+  compiled callable, never inside it. It costs ~10-20 us: noise against case 13
+  (~50 ms), roughly 10% against case 2 (~2 ms).
+
+#### Two API notes
+
+- Both torch 2.6.0+cu124 and 2.13.0+cu130 accept `attn_mask` together with
+  `is_causal=True` and apply both, **contrary to the documentation**. Verified
+  against a hand-computed reference at `max_abs` 3.6e-07 on each. The upstream
+  code already relies on this; recording it so it reads as deliberate.
+- The earlier claim that the key-mask route *collapses* under padding (case 13,
+  219 ms vs 49 ms) was **torch 2.6.0+cu124 only** and does not reproduce on
+  2.13.0+cu130, where the same comparison is 51.2 ms vs 48.8 ms. Do not plan
+  against it.
+
+#### Resolved: the gain grows under compilation
+
+Measured 30 August 2026 on the pinned cu130 stack, A/B of `src.dispatcher`
+against itself with only `drop_key_mask` differing, both sides fully compiled:
+
+| Case | drop / keep | floor | significant |
+| ---: | ---: | ---: | --- |
+| 13 | **1.153x / 1.155x** | ±0.34-0.52% | yes |
+| 1 | **1.123x / 1.112x** | ±0.76-0.78% | yes |
+| 11 | **1.095x** (both pr) | ±0.61-0.71% | yes |
+| 12 | **1.036x** | ±0.71% | yes |
+| 2 | 1.037x / 1.049x | ±5.0-6.3% | no |
+| 3 | 1.022x | ±4.47% | no |
+
+Six significant and positive, four positive but inside their floors, none
+negative. Eager was ~2-5% on the large shapes; compiled it is 9.5-15.5%, so the
+optimization is worth **more** in the shipped configuration than the standalone
+candidate suggested. Records:
+[`../benchmarks/2026-08-30-rtx4060-85cfd8d/`](../benchmarks/2026-08-30-rtx4060-85cfd8d/README.md).
+
+#### Implemented, 30 August 2026
+
+The change is applied rather than only proposed. `sdpa.py` gained
+`drop_key_mask = False` (class-level, so behavior is unchanged unless enabled)
+and `dispatcher.py` gained `_may_drop_key_mask`, which enables it only after
+verifying **both** that the config is causal and that the mask is prefix-valid.
+It refuses on the reference route, on `causal=False`, on a general mask, and
+when no mask is present; `src/tests/test_dispatcher_key_mask.py` covers each.
+
+**The check runs once per runtime key, never per forward.** Measured, the host
+sync costs **85-99 us** — far more than the 10-20 us first assumed. Against case
+2's compiled forward (~0.2-0.4 ms) a per-call check would have consumed the gain
+several times over. It therefore runs on a cache miss beside compilation, and a
+test pins that it does not scale with call count.
+
+The residual assumption is that mask structure is stable for a given runtime
+key. That holds for the official harness, whose `generate_random_case` provably
+emits right-padded masks (pinned by `src/tests/test_padding_mask_redundancy.py`),
+and the dispatcher already gates on a static contract of comparable strength.

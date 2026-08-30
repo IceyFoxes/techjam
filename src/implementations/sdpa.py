@@ -11,7 +11,23 @@ from torch_transformer_benchmark import BaselineSelfAttention
 
 
 class StridedSDPASelfAttention(BaselineSelfAttention):
-    """Reference-compatible projections around SDPA without Q/K/V copies."""
+    """Reference-compatible projections around SDPA without Q/K/V copies.
+
+    ``drop_key_mask`` omits the broadcast key mask entirely. Under causal
+    attention with a right-padded mask this is bitwise exact, because causal
+    masking already writes -inf everywhere the key mask would, and the
+    reference zeroes the invalid query rows that genuinely differ. It measured
+    faster on every in-scope case. See
+    ``research/attention-softmax/safe-optimization-spec.md`` section 3 and
+    ``src/tests/test_padding_mask_redundancy.py``.
+
+    It is a class-level default so enabling it is always a deliberate act by
+    the owner of the model instance. **Only set it when both conditions hold**:
+    the configuration is causal, and the mask is prefix-valid. The dispatcher
+    validates both before enabling it.
+    """
+
+    drop_key_mask = False
 
     def _split_heads_view(self, x: torch.Tensor) -> torch.Tensor:
         batch, seq_len, _ = x.shape
@@ -39,10 +55,11 @@ class StridedSDPASelfAttention(BaselineSelfAttention):
         v = self._split_heads_view(self.v_proj(x))
 
         # True means that a key participates in attention. Do not inspect mask
-        # values on the host: that would synchronize and break graph replay.
+        # values on the host here: that would synchronize and break graph
+        # replay. ``drop_key_mask`` is resolved by the owner, outside this call.
         attn_mask = (
             None
-            if valid_token_mask is None
+            if valid_token_mask is None or self.drop_key_mask
             else valid_token_mask[:, None, None, :]
         )
         context = F.scaled_dot_product_attention(
@@ -134,7 +151,7 @@ class PackedQKVSDPASelfAttention(StridedSDPASelfAttention):
         q, k, v = self.project_qkv(x)
         attn_mask = (
             None
-            if valid_token_mask is None
+            if valid_token_mask is None or self.drop_key_mask
             else valid_token_mask[:, None, None, :]
         )
         context = F.scaled_dot_product_attention(

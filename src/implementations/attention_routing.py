@@ -1,0 +1,98 @@
+"""Attention route selection for the Person 2 candidate.
+
+The routing decision is deliberately separated from the attention module and
+from torch. It is a pure function of three booleans-worth of state, so the whole
+table is testable without a GPU, and Person 1 can call it to hoist the decision
+above a compiled region as ``dispatcher-strategy.md`` requires.
+"""
+
+from __future__ import annotations
+
+import enum
+from typing import Any, Optional
+
+
+class MaskKind(enum.Enum):
+    """How much structure a ``valid_token_mask`` has."""
+
+    ABSENT = "absent"
+    PREFIX = "prefix"
+    GENERAL = "general"
+
+
+class Route(enum.Enum):
+    """An attention implementation. All routes compute the same function."""
+
+    SDPA_CAUSAL = "sdpa_causal"
+    SDPA_CAUSAL_KEYMASK = "sdpa_causal_keymask"
+    SDPA_KEYMASK = "sdpa_keymask"
+    SDPA_FULLMASK = "sdpa_fullmask"
+    EXACT_EAGER = "exact_eager"
+    EXACT_EAGER_PREFIX = "exact_eager_prefix"
+
+
+def select_route(
+    is_float32: bool,
+    causal: bool,
+    mask_kind: MaskKind,
+) -> Route:
+    """Choose the attention implementation for one forward pass.
+
+    Exactly one route is selected per input class. ``SDPA_CAUSAL_KEYMASK``
+    computes the same function as ``SDPA_CAUSAL`` but measured slower on every
+    in-scope case, so it is never selected; it remains the module's construction
+    default, where its job is to reproduce upstream behavior until a route is
+    assigned.
+    """
+    if not is_float32:
+        # float16 SDPA fails the pass criterion on 0/8 seeds for case 13. The
+        # cause is the reference rounding probabilities to float16 before PV,
+        # which a fused kernel does not reproduce. See sdpa-and-precision.md.
+        #
+        # The padding mask may only be skipped when it is provably redundant,
+        # which needs BOTH causal attention and a prefix mask. A general mask
+        # (left padding, interior gaps) still has to be applied, so it gets the
+        # plain exact route. Both are bitwise identical to the reference.
+        if causal and mask_kind is MaskKind.PREFIX:
+            return Route.EXACT_EAGER_PREFIX
+        return Route.EXACT_EAGER
+
+    if mask_kind is MaskKind.ABSENT:
+        return Route.SDPA_CAUSAL
+
+    if not causal:
+        # Without an upper-triangular mask to subsume it, the padding mask has
+        # to be applied.
+        return Route.SDPA_KEYMASK
+
+    if mask_kind is MaskKind.PREFIX:
+        # Causal masking already sets -inf everywhere a right-padding mask
+        # would, so the mask is removable. Verified bitwise; see spec section 3.
+        return Route.SDPA_CAUSAL
+
+    return Route.SDPA_FULLMASK
+
+
+def classify_mask(valid_token_mask: Optional[Any]) -> MaskKind:
+    """Classify a ``[B, N]`` boolean mask. Performs ONE host synchronization.
+
+    A mask is ``PREFIX`` when it never rises along the sequence axis, which is
+    exactly the right-padded shape ``generate_random_case`` produces. Callers
+    must invoke this once per forward, above the layer loop: evaluating an
+    equivalent predicate per layer was measured to turn a 1.15-1.43x gain into a
+    0.82-0.95x loss.
+
+    It must also never be called from inside a compiled or graph-replayed
+    region. ``sdpa.py`` avoids host mask inspection for exactly this reason:
+    the synchronization breaks CUDA-graph replay, which the dispatcher relies
+    on for cases 1-12 under ``reduce-overhead``.
+    """
+    if valid_token_mask is None:
+        return MaskKind.ABSENT
+
+    if valid_token_mask.shape[-1] <= 1:
+        # A single position cannot rise, so it is trivially prefix-valid.
+        return MaskKind.PREFIX
+
+    non_increasing = bool((valid_token_mask[:, :-1] >= valid_token_mask[:, 1:]).all())
+    return MaskKind.PREFIX if non_increasing else MaskKind.GENERAL
