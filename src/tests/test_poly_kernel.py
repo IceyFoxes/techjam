@@ -102,5 +102,92 @@ class QuadApplyTests(unittest.TestCase):
         self._assert_no_worse_than_dense(a, s, quad_apply)
 
 
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+@unittest.skipIf(_cuda_missing(), "Triton kernels require CUDA")
+class QuadUpdateTests(unittest.TestCase):
+    def _case(self, M=2, C=128, D=64, V=64, seed=0):
+        gen = torch.Generator(device="cuda").manual_seed(seed)
+        b = (
+            torch.randn(M, C, D, generator=gen, device="cuda", dtype=torch.float16)
+            * 0.2
+        )
+        v = (
+            torch.randn(M, C, V, generator=gen, device="cuda", dtype=torch.float16)
+            * 0.2
+        )
+        return b, v
+
+    def _truth_fp32(self, b, v):
+        from src.implementations.poly_reference import phi2
+
+        return phi2(b.float()).transpose(-2, -1) @ v.float()
+
+    def _dense_fp16(self, b, v):
+        from src.implementations.poly_reference import phi2
+
+        return (phi2(b).transpose(-2, -1) @ v).float()
+
+    def _assert_no_worse_than_dense(self, b, v, D=64):
+        from src.kernels.poly_attention_triton import quad_update
+
+        M, _, _ = b.shape
+        out = torch.zeros(M, D * D, v.shape[2], device="cuda", dtype=torch.float32)
+        quad_update(b, v, out)
+        truth = self._truth_fp32(b, v)
+        kernel_err = (out - truth).abs().max().item()
+        dense_err = (self._dense_fp16(b, v) - truth).abs().max().item()
+        self.assertLessEqual(
+            kernel_err,
+            max(3.0 * dense_err, 1e-6),
+            f"kernel err {kernel_err:.3e} vs dense err {dense_err:.3e}",
+        )
+
+    def test_matches_dense_for_the_case_14_shape(self):
+        b, v = self._case(D=64, V=64)
+        self._assert_no_worse_than_dense(b, v)
+
+    def test_matches_dense_across_shapes(self):
+        for D in (16, 32, 64):
+            for C in (128, 512):
+                with self.subTest(D=D, C=C):
+                    b, v = self._case(C=C, D=D)
+                    self._assert_no_worse_than_dense(b, v, D=D)
+
+    def test_accumulates_rather_than_overwrites(self):
+        """The state is a running sum; two folds must equal one doubled fold."""
+        from src.kernels.poly_attention_triton import quad_update
+
+        b, v = self._case()
+        once = torch.zeros(2, 64 * 64, 64, device="cuda", dtype=torch.float32)
+        quad_update(b, v, once)
+        twice = torch.zeros_like(once)
+        quad_update(b, v, twice)
+        quad_update(b, v, twice)
+        self.assertLess((twice - 2 * once).abs().max().item(), 1e-3)
+
+    def test_handles_a_ragged_final_chunk(self):
+        b, v = self._case(C=100)
+        self._assert_no_worse_than_dense(b, v)
+
+    def test_single_column_for_the_denominator(self):
+        from src.kernels.poly_attention_triton import quad_update
+
+        b, _ = self._case()
+        ones = torch.ones(2, 128, 1, device="cuda", dtype=torch.float16)
+        out = torch.zeros(2, 64 * 64, 1, device="cuda", dtype=torch.float32)
+        quad_update(b, ones, out)
+        truth = self._truth_fp32(b, ones)
+        self.assertLess((out - truth).abs().max().item(), 1e-2)
+
+    def test_rejects_a_float16_state(self):
+        """The fp16-state trap must fail loudly, not compute something plausible."""
+        from src.kernels.poly_attention_triton import quad_update
+
+        b, v = self._case()
+        bad = torch.zeros(2, 64 * 64, 64, device="cuda", dtype=torch.float16)
+        with self.assertRaises(ValueError):
+            quad_update(b, v, bad)
+
+
 if __name__ == "__main__":
     unittest.main()
