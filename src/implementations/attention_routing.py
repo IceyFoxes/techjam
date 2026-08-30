@@ -35,16 +35,14 @@ def select_route(
     is_float32: bool,
     causal: bool,
     mask_kind: MaskKind,
-    prefer_keymask: bool = False,
 ) -> Route:
     """Choose the attention implementation for one forward pass.
 
-    ``prefer_keymask`` forces the upstream-equivalent route that keeps the
-    broadcast key mask. The two causal routes are numerically identical;
-    dropping the mask measured faster on all twelve in-scope cases at both
-    padding ratios, so this exists only to reproduce upstream behavior as an
-    A/B control, not as a routing alternative. It is ignored wherever the two
-    routes would not agree.
+    Exactly one route is selected per input class. ``SDPA_CAUSAL_KEYMASK``
+    computes the same function as ``SDPA_CAUSAL`` but measured slower on every
+    in-scope case, so it is never selected; it remains the module's construction
+    default, where its job is to reproduce upstream behavior until a route is
+    assigned.
     """
     if not is_float32:
         # float16 SDPA fails the pass criterion on 0/8 seeds for case 13. The
@@ -70,9 +68,7 @@ def select_route(
     if mask_kind is MaskKind.PREFIX:
         # Causal masking already sets -inf everywhere a right-padding mask
         # would, so the mask is removable. Verified bitwise; see spec section 3.
-        # Dropping it is also faster on every in-scope case, so the keymask
-        # route is only ever selected explicitly, as a measurement control.
-        return Route.SDPA_CAUSAL_KEYMASK if prefer_keymask else Route.SDPA_CAUSAL
+        return Route.SDPA_CAUSAL
 
     return Route.SDPA_FULLMASK
 

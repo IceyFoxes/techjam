@@ -190,13 +190,13 @@ class AttentionCandidateTests(unittest.TestCase):
             ffn_dim=16, num_layers=2, causal=causal,
         )
 
-    def _models(self, config, prefer_keymask=False):
+    def _models(self, config):
         from torch_transformer_benchmark import BaselineTransformer, copy_model_weights
         from src.implementations.attention import AttentionCandidate
 
         torch.manual_seed(3)
         baseline = BaselineTransformer(config).eval()
-        candidate = AttentionCandidate(config, prefer_keymask=prefer_keymask).eval()
+        candidate = AttentionCandidate(config).eval()
         copy_model_weights(baseline, candidate, strict=True)
         return baseline, candidate
 
@@ -208,10 +208,9 @@ class AttentionCandidateTests(unittest.TestCase):
         from torch_transformer_benchmark import compare_outputs, generate_random_case
 
         config = self._config()
-        for prefer_keymask in (False, True):
-            for ratio in (0.0, 0.3, 0.9):
-                with self.subTest(ratio=ratio, prefer_keymask=prefer_keymask):
-                    baseline, candidate = self._models(config, prefer_keymask)
+        for ratio in (0.0, 0.3, 0.9):
+            with self.subTest(ratio=ratio):
+                    baseline, candidate = self._models(config)
                     x, mask = generate_random_case(
                         config, torch.device("cpu"), torch.float32, 11, ratio, 1.0
                     )
@@ -284,13 +283,17 @@ class AttentionCandidateTests(unittest.TestCase):
         for layer in candidate.layers:
             self.assertIs(layer.attention.route, Route.SDPA_CAUSAL)
 
-    def test_both_candidate_specs_are_loadable(self) -> None:
-        from src.infra import load_candidate
+    def test_module_exports_exactly_one_candidate(self) -> None:
+        from src.infra import CandidateSpec, load_candidate
+        from src.implementations import attention as module
 
         self.assertEqual(load_candidate("attention").name, "attention")
-        self.assertEqual(
-            load_candidate("attention:KEYMASK_CANDIDATE").name, "attention-keymask"
-        )
+        specs = [
+            name
+            for name in dir(module)
+            if isinstance(getattr(module, name), CandidateSpec)
+        ]
+        self.assertEqual(specs, ["CANDIDATE"], msg=f"found {specs}")
 
 
 @unittest.skipIf(torch is None, "PyTorch is not installed")

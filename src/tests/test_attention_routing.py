@@ -43,22 +43,20 @@ class SelectRouteTests(unittest.TestCase):
     def test_causal_prefix_mask_drops_the_mask_by_default(self) -> None:
         self.assertIs(select_route(True, True, MaskKind.PREFIX), Route.SDPA_CAUSAL)
 
-    def test_causal_prefix_mask_can_keep_the_key_mask(self) -> None:
-        self.assertIs(
-            select_route(True, True, MaskKind.PREFIX, prefer_keymask=True),
-            Route.SDPA_CAUSAL_KEYMASK,
-        )
+    def test_keymask_route_is_never_selected(self) -> None:
+        """It is the construction default only, not a routing alternative.
 
-    def test_prefer_keymask_is_ignored_when_it_would_change_semantics(self) -> None:
-        # The preference is a measurement control for the causal+prefix case only.
-        self.assertIs(
-            select_route(True, True, MaskKind.GENERAL, prefer_keymask=True),
-            Route.SDPA_FULLMASK,
-        )
-        self.assertIs(
-            select_route(True, False, MaskKind.PREFIX, prefer_keymask=True),
-            Route.SDPA_KEYMASK,
-        )
+        ``SDPA_CAUSAL_KEYMASK`` reproduces upstream ``sdpa.py`` behavior and
+        measured slower on every in-scope case. Nothing should route to it.
+        """
+        for is_f32 in (True, False):
+            for causal in (True, False):
+                for kind in MaskKind:
+                    self.assertIsNot(
+                        select_route(is_f32, causal, kind),
+                        Route.SDPA_CAUSAL_KEYMASK,
+                        msg=f"f32={is_f32} causal={causal} kind={kind}",
+                    )
 
     def test_causal_general_mask_needs_the_full_mask(self) -> None:
         self.assertIs(select_route(True, True, MaskKind.GENERAL), Route.SDPA_FULLMASK)
