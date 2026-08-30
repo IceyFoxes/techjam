@@ -278,6 +278,15 @@ doing nothing at all.
 
 ## 8. Phase 2 forward-compatibility
 
+> **Section 8.1 superseded 30 August 2026** by
+> [`integrated-kernel-spec.md`](integrated-kernel-spec.md). Its two-level
+> sequence-parallel scan answers an occupancy problem the shipped kernels do not
+> have: they grid over `(C/BC, M)` and `(D/BI, M)` and launch 256 and 2048
+> programs at B=2, not 16. The scan is not being built. The original wording is
+> preserved below unchanged.
+>
+> **Section 8.2 remains current** and is inherited by the Phase 2 spec.
+
 Decisions Phase 1 must make now so Phase 2 is not a rewrite.
 
 ### 8.1 Parallelism

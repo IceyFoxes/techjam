@@ -1,0 +1,29 @@
+------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                                        Name    Self CPU %      Self CPU   CPU total %     CPU total  CPU time avg     Self CUDA   Self CUDA %    CUDA total  CUDA time avg    # of Calls  
+------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+                                         _quad_update_kernel         0.00%       0.000us         0.00%       0.000us       0.000us     147.603ms        25.85%     147.603ms     753.077us           196  
+                                          _quad_apply_kernel         0.00%       0.000us         0.00%       0.000us       0.000us     144.923ms        25.38%     144.923ms     743.192us           195  
+void at::native::vectorized_elementwise_kernel<4, at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us      47.260ms         8.28%      47.260ms     241.121us           196  
+void cutlass::Kernel2<cutlass_80_wmma_tensorop_f16_s16161...         0.00%       0.000us         0.00%       0.000us       0.000us      32.343ms         5.66%      32.343ms      55.477us           583  
+void at::native::elementwise_kernel<128, 4, at::native::g...         0.00%       0.000us         0.00%       0.000us       0.000us      28.649ms         5.02%      28.649ms     146.167us           196  
+void at::native::vectorized_elementwise_kernel<4, at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us      27.033ms         4.73%      27.033ms      13.821us          1956  
+              ampere_fp16_s16816gemm_fp16_128x64_ldg8_f2f_tn         0.00%       0.000us         0.00%       0.000us       0.000us      23.942ms         4.19%      23.942ms     122.780us           195  
+void at::native::elementwise_kernel<128, 4, at::native::g...         0.00%       0.000us         0.00%       0.000us       0.000us      19.216ms         3.36%      19.216ms      24.479us           785  
+void at::native::unrolled_elementwise_kernel<at::native::...         0.00%       0.000us         0.00%       0.000us       0.000us      17.699ms         3.10%      17.699ms      10.056us          1760  
+void at::native::elementwise_kernel<128, 4, at::native::g...         0.00%       0.000us         0.00%       0.000us       0.000us      16.076ms         2.82%      16.076ms      41.009us           392  
+void at::native::reduce_kernel<512, 1, at::native::Reduce...         0.00%       0.000us         0.00%       0.000us       0.000us       9.904ms         1.73%       9.904ms      50.528us           196  
+void cutlass::Kernel2<cutlass_80_wmma_tensorop_f16_s16161...         0.00%       0.000us         0.00%       0.000us       0.000us       9.278ms         1.62%       9.278ms      23.668us           392  
+void at::native::reduce_kernel<128, 4, at::native::Reduce...         0.00%       0.000us         0.00%       0.000us       0.000us       8.739ms         1.53%       8.739ms      22.294us           392  
+void at::native::reduce_kernel<512, 1, at::native::Reduce...         0.00%       0.000us         0.00%       0.000us       0.000us       7.036ms         1.23%       7.036ms      36.081us           195  
+void at::native::elementwise_kernel<128, 2, at::native::g...         0.00%       0.000us         0.00%       0.000us       0.000us       5.955ms         1.04%       5.955ms      15.269us           390  
+void at::native::vectorized_elementwise_kernel<4, at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us       5.796ms         1.02%       5.796ms       7.431us           780  
+void at::native::vectorized_elementwise_kernel<4, at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us       5.666ms         0.99%       5.666ms       7.254us           781  
+void pytorch_flash::flash_fwd_kernel<Flash_fwd_kernel_tra...         0.00%       0.000us         0.00%       0.000us       0.000us       5.242ms         0.92%       5.242ms       5.242ms             1  
+void at::native::elementwise_kernel<128, 2, at::native::g...         0.00%       0.000us         0.00%       0.000us       0.000us       4.485ms         0.79%       4.485ms      22.880us           196  
+void cutlass::Kernel2<cutlass_80_wmma_tensorop_f16_s16161...         0.00%       0.000us         0.00%       0.000us       0.000us       1.958ms         0.34%       1.958ms      10.039us           195  
+void at::native::vectorized_elementwise_kernel<4, at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us       1.594ms         0.28%       1.594ms       8.176us           195  
+void at::native::vectorized_elementwise_kernel<4, at::nat...         0.00%       0.000us         0.00%       0.000us       0.000us     453.984us         0.08%     453.984us       2.316us           196  
+------------------------------------------------------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  ------------  
+Self CPU time total: 383.168ms
+Self CUDA time total: 571.060ms
+

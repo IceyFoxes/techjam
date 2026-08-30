@@ -5,6 +5,17 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx4060-6dc9639/`](2026-08-30-rtx4060-6dc9639/README.md): Person 2
+  kernel-level **profile** of the Phase 1 polynomial path, taken to decide what
+  Phase 2 should target. The two Triton kernels are 51% of GPU time and the
+  PyTorch glue around them is the other half; the exact diagonal block is 25-35%
+  on its own and computes a full `C x C` score matrix it then masks in half.
+  **Its millisecond column is attribution, not latency** — four identical runs
+  spread 2.17x while the kernels' share held at 51-55%, which is the evidence
+  behind the Phase 2 spec's blocking noise-floor task. Also records two negative
+  results: no tile schedule outside the shipped autotune space is materially
+  faster, and doing the causal skip by sub-blocking in PyTorch is 2.7x slower
+  than not doing it.
 - [`2026-08-30-rtx4060-poly/`](2026-08-30-rtx4060-poly/README.md): Person 2 fused
   polynomial attention kernel, Phase 1 acceptance. **4.31x at the real chunk
   shape (B=2, N=100000): 328.1 ms against 1414.0 ms exact flash**, with peak-VRAM
