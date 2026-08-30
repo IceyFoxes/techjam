@@ -5,6 +5,13 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx4060-85cfd8d/`](2026-08-30-rtx4060-85cfd8d/README.md): Person 2
+  attention mask-route sweep on the pinned cu130 stack. All twelve in-scope
+  cases x `padding_ratio` 0.0/0.3 x two routes, 5/5 seeds each with zero failed
+  elements. Dropping the causal padding key mask is ahead in 20 comparisons,
+  tied in 4, behind in none. Includes a case 6 correctness-and-memory record
+  whose latency is explicitly **not** a claim: it is `WITHIN NOISE` and ran under
+  host-memory oversubscription (10,648 MiB peak on an 8,188 MiB card).
 - [`2026-08-29-l4-f128f6e/`](2026-08-29-l4-f128f6e/README.md): Person 4
   extreme-memory checkpoint on NVIDIA L4. Official Case 6 passes 1/1 with zero
   failed elements, 2.487x one-sample speedup, and 2.61 GiB candidate incremental

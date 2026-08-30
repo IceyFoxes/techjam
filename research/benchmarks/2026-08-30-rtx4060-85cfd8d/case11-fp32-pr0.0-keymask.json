@@ -1,0 +1,288 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.0010466575622558594,
+    "max_relative_error": 351.63250732421875,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 5242880,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0010466575622558594,
+        "max_relative_error": 78.17078399658203,
+        "mean_abs_error": 9.273066825699061e-05,
+        "optimized_at_worst": 2.1265993118286133,
+        "passed": true,
+        "reference_at_worst": 2.127645969390869,
+        "seed": 1234,
+        "total_elements": 1048576,
+        "trial": 1,
+        "worst_index": [
+          36,
+          4,
+          92
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0008874833583831787,
+        "max_relative_error": 60.18951416015625,
+        "mean_abs_error": 9.341182885691524e-05,
+        "optimized_at_worst": -0.4158422350883484,
+        "passed": true,
+        "reference_at_worst": -0.4149547517299652,
+        "seed": 1235,
+        "total_elements": 1048576,
+        "trial": 2,
+        "worst_index": [
+          1,
+          2,
+          111
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0009682774543762207,
+        "max_relative_error": 126.26830291748047,
+        "mean_abs_error": 9.336536459159106e-05,
+        "optimized_at_worst": 0.27456414699554443,
+        "passed": true,
+        "reference_at_worst": 0.2735958695411682,
+        "seed": 1236,
+        "total_elements": 1048576,
+        "trial": 3,
+        "worst_index": [
+          20,
+          1,
+          68
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0010182857513427734,
+        "max_relative_error": 351.63250732421875,
+        "mean_abs_error": 9.30770838749595e-05,
+        "optimized_at_worst": 0.6085979342460632,
+        "passed": true,
+        "reference_at_worst": 0.609616219997406,
+        "seed": 1237,
+        "total_elements": 1048576,
+        "trial": 4,
+        "worst_index": [
+          37,
+          1,
+          75
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0009631514549255371,
+        "max_relative_error": 137.1539306640625,
+        "mean_abs_error": 9.28220251807943e-05,
+        "optimized_at_worst": 0.4734126031398773,
+        "passed": true,
+        "reference_at_worst": 0.4724494516849518,
+        "seed": 1238,
+        "total_elements": 1048576,
+        "trial": 5,
+        "worst_index": [
+          3,
+          4,
+          21
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "description": "Mask-routed SDPA retaining the broadcast key mask; A/B control.",
+    "name": "attention-keymask",
+    "owner": "Person 2",
+    "selector": "attention:KEYMASK_CANDIDATE",
+    "self_compiling": false,
+    "strict_weight_copy": true,
+    "unsupported_official_cases": []
+  },
+  "command": "/home/izo/techjam/.venv/bin/python /home/izo/techjam/src/benchmark.py --candidate attention:KEYMASK_CANDIDATE --device cuda --dtype float32 --case 11 --padding-ratio 0.0 --repeats 40 --settle-seconds 20 --output research/benchmarks/2026-08-30-rtx4060-85cfd8d/case11-fp32-pr0.0-keymask.json",
+  "config": {
+    "batch_size": 64,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 16,
+    "num_layers": 4,
+    "seq_len": 128
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 832779886592,
+      "path": "/home/izo/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU"
+    },
+    "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python": "3.12.14",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "85cfd8d3177d2e59f84cf98183731683e7e0ac9b",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-30-rtx4060-85cfd8d/"
+  },
+  "input_scale": 1.0,
+  "nvtx_enabled": false,
+  "official_case_id": 11,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.0,
+  "performance": {
+    "baseline": {
+      "mean_ms": 19.408972930908202,
+      "median_ms": 19.381589253743492,
+      "min_ms": 19.10271962483724,
+      "p90_ms": 19.615300623575845,
+      "samples_ms": [
+        19.658069610595703,
+        19.696640014648438,
+        19.632811228434246,
+        19.83658727010091,
+        19.6133550008138,
+        19.356671651204426,
+        19.553621927897137,
+        19.373738606770832,
+        19.556011199951172,
+        19.381248474121094,
+        19.516075134277344,
+        19.33141326904297,
+        19.413333892822266,
+        19.303082784016926,
+        19.608234405517578,
+        19.212970733642578,
+        19.457706451416016,
+        19.374762217203777,
+        19.456682840983074,
+        19.291136423746746,
+        19.4160639444987,
+        19.286357879638672,
+        19.394901275634766,
+        19.363157908121746,
+        19.341312408447266,
+        19.271338144938152,
+        19.436203002929688,
+        19.37271499633789,
+        19.517781575520832,
+        19.382612864176433,
+        19.58126958211263,
+        19.420501708984375,
+        19.267242431640625,
+        19.21604283650716,
+        19.220138549804688,
+        19.28123728434245,
+        19.213653564453125,
+        19.10271962483724,
+        19.381930033365887,
+        19.267584482828777
+      ],
+      "tokens_per_second": 422669.15745403804
+    },
+    "block_size": 3,
+    "candidate": {
+      "mean_ms": 6.778666718800862,
+      "median_ms": 6.562645594278971,
+      "min_ms": 5.488298416137695,
+      "p90_ms": 8.254907480875652,
+      "samples_ms": [
+        8.66542943318685,
+        6.553600311279297,
+        6.81062380472819,
+        6.636202494303386,
+        6.877866744995117,
+        7.372458775838216,
+        7.243093490600586,
+        5.723136266072591,
+        8.572245279947916,
+        5.571242650349935,
+        7.327744166056315,
+        5.622442881266276,
+        7.3652909596761065,
+        6.434815724690755,
+        10.566997528076172,
+        5.776383717854817,
+        6.759082794189453,
+        6.688085556030273,
+        6.455637613932292,
+        5.952512105305989,
+        6.681599934895833,
+        6.057984034220378,
+        6.517759958902995,
+        6.3416322072347,
+        6.211584091186523,
+        6.388394673665364,
+        7.803904215494792,
+        5.925546646118164,
+        6.671701431274414,
+        6.0719788869222,
+        6.612650553385417,
+        6.2552744547526045,
+        8.219647725423178,
+        5.780480066935222,
+        7.869440078735352,
+        5.488298416137695,
+        6.5716908772786455,
+        6.1255677541097,
+        8.72652816772461,
+        5.850112279256185
+      ],
+      "tokens_per_second": 1248277.067885767
+    },
+    "gpu_state": {
+      "clocks.mem": "8001",
+      "clocks.sm": "2040",
+      "clocks_throttle_reasons.active": "0x0000000000000004",
+      "power.draw": "52.93",
+      "power.limit": "[N/A]",
+      "temperature.gpu": "77"
+    },
+    "memory": {
+      "baseline": {
+        "before_allocated_bytes": 15910912,
+        "before_reserved_bytes": 207618048,
+        "incremental_peak_allocated_bytes": 167804928,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 183715840,
+        "peak_reserved_bytes": 207618048
+      },
+      "candidate": {
+        "before_allocated_bytes": 15910912,
+        "before_reserved_bytes": 207618048,
+        "incremental_peak_allocated_bytes": 33562624,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 49473536,
+        "peak_reserved_bytes": 207618048
+      }
+    },
+    "noise_floor_ratio": 0.1477583894168363,
+    "repeats": 40,
+    "settle_seconds": 20.0,
+    "significant": true,
+    "speedup": 2.9533195074010274,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "paired"
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-29T17:06:37.267667+00:00"
+}
