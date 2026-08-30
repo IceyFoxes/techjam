@@ -157,5 +157,94 @@ class PolyRouteExecutionTests(unittest.TestCase):
             module(x, mask, True)
 
 
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+@unittest.skipIf(_cuda_missing(), "requires CUDA")
+class PolyMemoryTests(unittest.TestCase):
+    """Peak VRAM must stay close to the exact path's.
+
+    Case 14 streams 1-2 samples at a time against a fixed budget, so the
+    polynomial route's working set is a hard constraint, not a nicety. An
+    earlier version passed 3-D tensors to the prefix SDPA, which silently
+    selected the quadratic math backend and cost 2.4 GiB per sample -- and no
+    test noticed, because every correctness test still passed.
+
+    Inputs here are STRIDED VIEWS, matching what _split_heads_view actually
+    produces. With contiguous inputs the internal reshape is free and this
+    measures nothing.
+    """
+
+    def _strided_qkv(self, B=1, N=16384, H=16, D=64):
+        torch.manual_seed(0)
+        packed = [
+            (torch.randn(B, N, H * D, device="cuda") * 0.577).half()
+            for _ in range(3)
+        ]
+        views = tuple(t.view(B, N, H, D).transpose(1, 2) for t in packed)
+        input_bytes = sum(t.numel() * t.element_size() for t in packed)
+        return views, input_bytes
+
+    def _peak_mib(self, fn, warm=True):
+        """Peak allocation of one call, in MiB.
+
+        ``warm`` runs the function once first, so the measurement is the
+        steady-state working set rather than the one-off Triton autotuning
+        allocation. Autotuning happens on the first chunk of a real run and is
+        bounded; what must not grow with the workload is the steady state.
+        """
+        if warm:
+            del_me = fn()
+            del del_me
+        torch.cuda.empty_cache()
+        torch.cuda.reset_peak_memory_stats()
+        base = torch.cuda.memory_allocated()
+        result = fn()
+        peak = torch.cuda.max_memory_allocated() - base
+        del result
+        return peak / 2 ** 20
+
+    def test_peak_is_bounded_by_the_input_size(self):
+        from src.implementations.poly_attention import poly_attention_forward
+
+        (q, k, v), input_bytes = self._strided_qkv()
+        scale = q.shape[-1] ** -0.5
+        with torch.inference_mode():
+            peak = self._peak_mib(
+                lambda: poly_attention_forward(q, k, v, scale, sigma=0.3338)
+            )
+        budget = 2.0 * input_bytes / 2 ** 20
+        self.assertLess(
+            peak,
+            budget,
+            f"peak {peak:.0f} MiB exceeds {budget:.0f} MiB "
+            f"(2x the {input_bytes / 2 ** 20:.0f} MiB of q/k/v)",
+        )
+
+    def test_peak_does_not_blow_up_relative_to_flash(self):
+        import torch.nn.functional as F
+        from torch.nn.attention import SDPBackend, sdpa_kernel
+
+        from src.implementations.poly_attention import poly_attention_forward
+
+        (q, k, v), _ = self._strided_qkv()
+        scale = q.shape[-1] ** -0.5
+        with torch.inference_mode():
+
+            def flash():
+                with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+                    return F.scaled_dot_product_attention(
+                        q, k, v, is_causal=True, scale=scale
+                    )
+
+            flash_peak = self._peak_mib(flash)
+            poly_peak = self._peak_mib(
+                lambda: poly_attention_forward(q, k, v, scale, sigma=0.3338)
+            )
+        self.assertLess(
+            poly_peak,
+            6.0 * flash_peak,
+            f"poly peak {poly_peak:.0f} MiB against flash {flash_peak:.0f} MiB",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

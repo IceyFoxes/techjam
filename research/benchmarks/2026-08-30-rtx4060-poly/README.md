@@ -3,8 +3,29 @@
 Phase 1 acceptance run for the Triton kernel specified in
 [`../../attention-softmax/triton-kernel-spec.md`](../../attention-softmax/triton-kernel-spec.md).
 
-Date: 30 August 2026. Commit: see `attention-core.json` (`git` block).
-Verdict: **ACCEPTED** — 342.4 ms against the 360 ms acceptance threshold.
+Date: 30 August 2026. Commit: see the JSON files (`git` block).
+Verdict: **ACCEPTED** — 2.41x at the real chunk shape.
+
+## Correction, 30 August 2026 — supersedes `attention-core.json`
+
+The original run in `attention-core.json` recorded **342.4 ms / 2.12x**. That
+figure is **superseded and should not be quoted**, for three independent
+reasons found while investigating a VRAM overrun:
+
+1. **It used contiguous `[B, H, N, D]` inputs.** The real module hands the
+   attention path *strided views* from `_split_heads_view`. With contiguous
+   inputs the internal `reshape` is free; with strided ones it copies all of
+   q/k/v. On realistic inputs the same code measured **469.5 ms**.
+2. **A bug inflated it.** The `exact_prefix` SDPA call passed 3-D tensors, which
+   every fused backend rejects, so it silently fell back to the quadratic math
+   backend — materialising an `[M, 4096, 4096]` score matrix. That cost
+   **2.4 GiB and ~72 ms** on every call.
+3. **The variants were timed back to back.** On this laptop GPU the third
+   variant runs on a throttled card. Measured sequentially the polynomial path
+   read 392 ms; interleaved, and alone, it reads 275-300 ms.
+
+The numbers below are from the corrected harness: strided inputs, the 4-D
+prefix fix, the sliced scan, and interleaved timing.
 
 ## Latency
 
@@ -13,21 +34,44 @@ This is the unit of work case 14's route actually executes: it streams 1-2
 samples at a time (`choose_batch_chunk_size` selected 2 on a 24 GB L4). Best of
 3 timed reps after one warmup, which absorbs Triton autotuning.
 
-| path | time | vs exact | correct |
-| --- | ---: | ---: | :---: |
-| exact flash SDPA (case 14's current route) | 725.7 ms | 1.00x | yes |
-| polynomial, dense PyTorch | 662.8 ms | 1.09x | yes |
-| **polynomial, fused Triton** | **342.4 ms** | **2.12x** | **yes** |
+Interleaved A/B/C timing, best of 4 reps after warmup, strided inputs.
 
-Also **1.94x over the dense-PyTorch polynomial path**, which is the figure that
-isolates the kernel's own contribution from the algorithm's.
+**B=1** (`attention-core-v2.json`):
 
-The 725.7 ms and 662.8 ms figures reproduce the 719.8 ms and 603.9 ms recorded
-in [`../../attention-softmax/long-sequence-attention.md`](../../attention-softmax/long-sequence-attention.md)
-section 4.4 to within run-to-run variation. The PyTorch polynomial path is ~10%
-slower than its earlier measurement; it now writes both the numerator and
-denominator quadratic states through the same code path, and no attempt was made
-to re-tune it.
+| path | time | vs exact | peak MiB |
+| --- | ---: | ---: | ---: |
+| exact flash SDPA | 713.5 ms | 1.00x | 201 |
+| polynomial, dense PyTorch | 580.3 ms | 1.23x | — |
+| **polynomial, fused Triton** | **300.1 ms** | **2.38x** | **265** |
+
+**B=2 — the shape case 14's route actually streams** (`attention-core-b2.json`):
+
+| path | time | vs exact | peak MiB |
+| --- | ---: | ---: | ---: |
+| exact flash SDPA | 1426.4 ms | 1.00x | 404 |
+| polynomial, dense PyTorch | 1299.7 ms | 1.10x | — |
+| **polynomial, fused Triton** | **591.6 ms** | **2.41x** | **535** |
+
+Also 1.93x (B=1) and 2.20x (B=2) over the dense-PyTorch polynomial path, which
+isolates the kernel's contribution from the algorithm's.
+
+## Peak VRAM — the constraint that prompted the correction
+
+The polynomial route's overhead above exact flash, at `N=100000`:
+
+| | before | after | reduction |
+| --- | ---: | ---: | ---: |
+| B=1 | +2834 MiB | **+64 MiB** | 44x |
+| B=2 | +6773 MiB | **+131 MiB** | 52x |
+
+The +6.8 GiB at B=2 is what pushed a 13 GiB run past 16 GiB. Two causes, both
+now fixed: the 3-D SDPA fallback (2.4 GiB, fixed-size), and full-length
+contiguous copies from `reshape` on strided views plus the pre-scaled `a_all` /
+`b_all` (~2.4 GiB at B=2, O(N)).
+
+Pinned by `src/tests/test_poly_attention.py::PolyMemoryTests`, which asserts the
+peak stays under 2x the q/k/v input bytes **using strided inputs** — with
+contiguous inputs the test would measure nothing.
 
 ## Correctness
 
@@ -114,4 +158,9 @@ Full machine-readable environment is in `attention-core.json`.
   the benchmark's small scores — a property of the random initialisation, not of
   attention. The guard exists for exactly that reason.
 - **Single-GPU evidence.** No RTX 5080 or L4 numbers.
-- Latency is best-of-3; no noise floor was established by repeated runs.
+- Latency is best-of-4 interleaved; no formal noise floor was established. The
+  spread seen while investigating was material: 256-305 ms across repeats at
+  B=1, so treat 2.4x as approximate rather than precise.
+- **This laptop GPU throttles under sustained load.** Any future comparison here
+  must interleave variants rather than run them back to back; measuring
+  sequentially inflated the last-measured variant by ~30%.
