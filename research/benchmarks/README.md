@@ -5,6 +5,14 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx5080-b9506f3/`](2026-08-30-rtx5080-b9506f3/README.md):
+  PR #16 Case 14 three-reference validation. The standalone fused polynomial
+  attention core is 1.561x faster than exact Flash and passes reduced dense and
+  full-length Flash-oracle checks. However, the submitted dispatcher never
+  selects it; when locally wired, full Case 14 is **16.886x slower** and uses
+  2.58 GiB more peak allocation than the branch-base Flash route on this 16 GiB
+  RTX 5080. Treat the kernel speedup as microbenchmark-only and do not merge the
+  PR as-is.
 - [`2026-08-30-rtx5080-ce3f7f2/`](2026-08-30-rtx5080-ce3f7f2/README.md):
   PR #15 three-reference validation after integrating current `master`. Case 3
   improves 1.218x over the branch-base dispatcher and passes 60/60 stress
