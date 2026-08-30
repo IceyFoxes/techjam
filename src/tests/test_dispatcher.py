@@ -83,7 +83,6 @@ class DispatcherPolicyTests(unittest.TestCase):
 
         contracts = (
             (6, {**self.VALIDATED_CONTRACT, "dtype": torch.float16}),
-            (14, {**self.VALIDATED_CONTRACT, "dtype": torch.float32}),
             (14, {**self.VALIDATED_CONTRACT, "dtype": torch.bfloat16}),
             (
                 14,
@@ -99,6 +98,17 @@ class DispatcherPolicyTests(unittest.TestCase):
             with self.subTest(case=case_id, contract=contract):
                 route = select_route(self._config(case_id), **contract)
                 self.assertEqual(route.backend, UNSUPPORTED_BACKEND)
+
+    def test_case14_accepts_fp16_and_fp32(self):
+        from src.dispatcher import EXTREME_MEMORY_BACKEND, select_route
+
+        for dtype in (torch.float16, torch.float32):
+            with self.subTest(dtype=dtype):
+                route = select_route(
+                    self._config(14),
+                    **{**self.VALIDATED_CONTRACT, "dtype": dtype},
+                )
+                self.assertEqual(route.backend, EXTREME_MEMORY_BACKEND)
 
     def test_accepts_ampere_and_newer_gpu_models(self):
         from src.dispatcher import COMPILED_SDPA_BACKEND, select_route
@@ -252,6 +262,37 @@ class DispatcherExecutionTests(unittest.TestCase):
         candidate.half()
 
         self.assertEqual(next(candidate.parameters()).dtype, torch.float16)
+
+    def test_case14_streamed_entrypoint_requires_the_official_model(self):
+        from src.dispatcher import UnsupportedCaseError
+
+        _, candidate = self._models(self.small_config)
+        with torch.inference_mode(), self.assertRaises(UnsupportedCaseError):
+            candidate.forward_case14_streamed_sample(
+                torch.randn(1, 8, 16),
+                torch.ones(1, 8, dtype=torch.bool),
+            )
+
+    @unittest.skipUnless(torch.cuda.is_available(), "CUDA is required")
+    def test_case14_fp32_wrapper_reproduces_fp16_backend(self):
+        from src.implementations.extreme import ExtremeShapeCandidate
+        from torch_transformer_benchmark import copy_model_weights
+
+        config = self._official_config(14)
+        _, candidate = self._models(config)
+        fp16 = ExtremeShapeCandidate(config).eval()
+        copy_model_weights(candidate, fp16)
+        candidate = candidate.cuda().float()
+        fp16 = fp16.cuda().half()
+        torch.manual_seed(1234)
+        x = torch.randn(1, 512, config.d_model, device="cuda")
+        mask = torch.ones(1, 512, device="cuda", dtype=torch.bool)
+
+        with torch.inference_mode():
+            expected = fp16(x.half(), mask).float()
+            actual = candidate.forward_case14_streamed_sample(x, mask)
+
+        self.assertTrue(torch.equal(expected, actual))
 
     def test_cpu_fallback_is_bitwise_reference_with_padding(self):
         baseline, candidate = self._models(self.small_config)
