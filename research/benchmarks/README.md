@@ -5,6 +5,12 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx5080-fecf994/#case-6-full-official-comparison`](2026-08-30-rtx5080-fecf994/README.md#case-6-full-official-comparison):
+  official Case 6 float32 comparison on the RTX 5080. The memory-safe dispatcher
+  passes 5/5 seeds with zero failed elements, improves latency from 354.862 ms
+  to 149.436 ms (**2.375x**), and reduces process peak allocation from
+  10,672.719 MiB to 2,312.512 MiB. A reference-versus-reference control is
+  approximately neutral at 1.010x.
 - [`2026-08-30-rtx5080-b9506f3/`](2026-08-30-rtx5080-b9506f3/README.md):
   PR #16 Case 14 three-reference validation. The standalone fused polynomial
   attention core is 1.561x faster than exact Flash and passes reduced dense and
