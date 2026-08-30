@@ -163,33 +163,47 @@ In-process A/B of `src.dispatcher` against itself, identical in every respect
 except `drop_key_mask`. Both sides fully compiled through the routed path
 (`reduce-overhead` for cases 1-12, `default` for 13), same process, interleaved.
 
-| Case | pr | keep mask | drop mask | drop / keep | floor | significant |
-| ---: | --- | ---: | ---: | ---: | ---: | --- |
-| 13 | 0.0 | 51.105 ms | 44.317 ms | **1.153x** | ±0.34% | yes |
-| 13 | 0.3 | 51.288 ms | 44.398 ms | **1.155x** | ±0.52% | yes |
-| 1 | 0.0 | 1.669 ms | 1.486 ms | **1.123x** | ±0.78% | yes |
-| 1 | 0.3 | 1.652 ms | 1.486 ms | **1.112x** | ±0.76% | yes |
-| 11 | 0.0 | 3.930 ms | 3.590 ms | **1.095x** | ±0.61% | yes |
-| 11 | 0.3 | 3.752 ms | 3.427 ms | **1.095x** | ±0.71% | yes |
-| 12 | 0.0 | 0.480 ms | 0.464 ms | **1.036x** | ±0.71% | yes |
-| 2 | 0.0 | 0.374 ms | 0.361 ms | 1.037x | ±4.99% | no |
-| 2 | 0.3 | 0.343 ms | 0.327 ms | 1.049x | ±6.30% | no |
-| 3 | 0.0 | 0.266 ms | 0.260 ms | 1.022x | ±4.47% | no |
+| Case | B | H | N | d_h | pr | keep mask | drop mask | gain | floor | sig |
+| ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | :-: |
+| 1 | 64 | 4 | 128 | 32 | 0.0 | 1.6685 ms | 1.4862 ms | **1.123x** | ±0.78% | yes |
+| 1 | 64 | 4 | 128 | 32 | 0.3 | 1.6522 ms | 1.4862 ms | **1.112x** | ±0.76% | yes |
+| 2 | 1 | 4 | 128 | 32 | 0.0 | 0.3743 ms | 0.3609 ms | 1.037x | ±4.99% | — |
+| 2 | 1 | 4 | 128 | 32 | 0.3 | 0.3430 ms | 0.3270 ms | 1.049x | ±6.30% | — |
+| 3 | 4 | 4 | 128 | 32 | 0.0 | 0.2658 ms | 0.2602 ms | 1.022x | ±4.47% | — |
+| 3 | 4 | 4 | 128 | 32 | 0.3 | 0.2713 ms | 0.2532 ms | **1.071x** | ±4.80% | yes |
+| 4 | 16 | 4 | 128 | 32 | 0.0 | 0.5361 ms | 0.5088 ms | **1.054x** | ±0.82% | yes |
+| 4 | 16 | 4 | 128 | 32 | 0.3 | 0.5301 ms | 0.5045 ms | **1.051x** | ±1.38% | yes |
+| 5 | 128 | 4 | 128 | 32 | 0.0 | 3.5421 ms | 3.2870 ms | **1.078x** | ±0.41% | yes |
+| 5 | 128 | 4 | 128 | 32 | 0.3 | 3.5616 ms | 3.3045 ms | **1.078x** | ±0.35% | yes |
+| 7 | 64 | 4 | 128 | 8 | 0.0 | 0.9890 ms | 0.8944 ms | **1.106x** | ±0.65% | yes |
+| 7 | 64 | 4 | 128 | 8 | 0.3 | 0.9892 ms | 0.8943 ms | **1.106x** | ±0.68% | yes |
+| 8 | 64 | 4 | 128 | 256 | 0.0 | 39.2233 ms | 39.0851 ms | **1.004x** | ±0.31% | yes |
+| 8 | 64 | 4 | 128 | 256 | 0.3 | 40.0835 ms | 39.8730 ms | **1.005x** | ±0.32% | yes |
+| 9 | 64 | 1 | 128 | 128 | 0.0 | 1.4158 ms | 1.3091 ms | **1.081x** | ±0.55% | yes |
+| 9 | 64 | 1 | 128 | 128 | 0.3 | 1.4167 ms | 1.3089 ms | **1.082x** | ±0.51% | yes |
+| 10 | 64 | 2 | 128 | 64 | 0.0 | 1.4105 ms | 1.2895 ms | **1.094x** | ±0.60% | yes |
+| 10 | 64 | 2 | 128 | 64 | 0.3 | 1.4234 ms | 1.2946 ms | **1.099x** | ±0.53% | yes |
+| 11 | 64 | 16 | 128 | 8 | 0.0 | 3.9302 ms | 3.5898 ms | **1.095x** | ±0.61% | yes |
+| 11 | 64 | 16 | 128 | 8 | 0.3 | 3.7522 ms | 3.4267 ms | **1.095x** | ±0.71% | yes |
+| 12 | 64 | 4 | 32 | 32 | 0.0 | 0.4804 ms | 0.4635 ms | **1.036x** | ±0.71% | yes |
+| 12 | 64 | 4 | 32 | 32 | 0.3 | 0.5137 ms | 0.4935 ms | **1.041x** | ±0.80% | yes |
+| 13 | 64 | 4 | 1024 | 32 | 0.0 | 51.1048 ms | 44.3172 ms | **1.153x** | ±0.34% | yes |
+| 13 | 64 | 4 | 1024 | 32 | 0.3 | 51.2876 ms | 44.3976 ms | **1.155x** | ±0.52% | yes |
 
-Cases 2, 3 and 12 were measured at 250 repeats with a 25 s settle; the rest at
-60 repeats with 15 s.
+21 of 24 significant and positive; the rest positive but inside their floors; **none negative**.
 
-**Six comparisons are significant and positive; four are positive but inside
-their floors. None is negative.** The launch-bound shapes (2, 3, 12) run in
-0.26-0.48 ms compiled, where attention is a small share of a forward dominated
-by kernel-launch overhead, so a small effect there is expected and mostly
-unresolvable.
+Repeats: 60 with a 15 s settle for cases 1, 11, 13; 150 with 20 s for cases 4,
+5, 7, 8, 9, 10; 250 with 25 s for the launch-bound cases 2, 3, 12.
 
 An earlier 60-repeat run put case 2 at **0.941x** at `padding_ratio=0`, which
-would have read as a regression. At 250 repeats the same comparison is 1.037x,
-and the pr=0.3 direction agreed all along. Its floor was ±14.9%, so the figure
-never supported a conclusion. Same lesson as the eager sweep: **sub-millisecond
-cases need hundreds of repeats.**
+would have read as a regression. At 250 repeats it is 1.037x, and the pr=0.3
+direction agreed all along. Its floor was ±14.9%, so the figure never supported
+a conclusion. Same lesson as the eager sweep: **sub-millisecond cases need
+hundreds of repeats.**
+
+Case 8 gains only 1.004-1.005x, but with a ±0.31% floor that is still
+significant. It is the projection-bound shape where attention is ~16% of device
+time, so a small attention gain is the expected result, not a disappointment.
 
 ### Why compiled beats eager
 
