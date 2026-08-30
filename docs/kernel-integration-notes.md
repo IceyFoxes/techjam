@@ -82,13 +82,28 @@ Full two-layer case-14-shaped model, `B=1`, float16, RTX 4060 Laptop.
 | exact flash | 16384 | 0 / 16,777,216 | 7.81e-03 |
 | exact flash | 32768 | 0 / 33,554,432 | 7.81e-03 |
 | exact flash | 65536 | 0 / 67,108,864 | 7.81e-03 |
-| exact flash | 100000 | see the run record | |
+| exact flash | 100000 | 0 / 102,400,000 | 7.81e-03 |
 
 `7.81e-03` is one float16 ulp at the output magnitude — the approximation error
 is below the representation noise floor.
 
-Latency and the acceptance verdict are in
+Latency, attention core only, one sample x one layer at `N=100000`:
+
+| path | time | vs exact |
+| --- | ---: | ---: |
+| exact flash SDPA (today's route) | 725.7 ms | 1.00x |
+| polynomial, dense PyTorch | 662.8 ms | 1.09x |
+| **polynomial, fused Triton** | **342.4 ms** | **2.12x** |
+
+The guard ceiling is `sigma = 0.45`, measured: `sigma 0.4808` was the largest
+value passing the criterion and `0.5217` the first to fail, against an operating
+point of `0.334`. Full sweep and environment in
 `research/benchmarks/2026-08-30-rtx4060-poly/`.
+
+**This is the attention core, not whole case 14.** Case 14 cannot run end to end
+on the 8 GiB card these numbers come from -- it needs a 12.21 GiB floor for the
+device-resident input and output alone -- so no end-to-end case-14 speedup is
+claimed here.
 
 ## Verification
 
