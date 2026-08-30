@@ -5,6 +5,12 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx5080-27af97d/`](2026-08-30-rtx5080-27af97d/README.md):
+  the editable benchmark's new FP32 Case-14 dispatcher route passes the streamed
+  FP32 oracle on 5/5 trials: zero failures across 16,384,000,000 elements,
+  `max_abs=0.010294`, and 3,643.988 MiB peak allocation. The candidate takes
+  52.397 s versus 449.663 s for the oracle (8.582x diagnostic ratio). This is a
+  linear-memory oracle comparison, not an immutable dense-baseline speedup.
 - [`2026-08-30-rtx5080-902b626/`](2026-08-30-rtx5080-902b626/README.md):
   the current FP16/polynomial Case-14 backend passes the new FP32 streamed
   oracle on all 32 full-length samples: zero failures across 3,276,800,000
