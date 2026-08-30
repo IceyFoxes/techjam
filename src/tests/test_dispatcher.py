@@ -179,27 +179,28 @@ class DispatcherExecutionTests(unittest.TestCase):
         baseline, candidate = self._models(self.small_config)
         self.assertEqual(list(baseline.state_dict()), list(candidate.state_dict()))
 
-    def test_only_case2_uses_packed_qkv_attention(self):
+    def test_only_cases2_and3_use_packed_qkv_attention(self):
+        from src.dispatcher import PACKED_QKV_CASES
         from src.implementations.sdpa import (
             PackedQKVSDPASelfAttention,
             StridedSDPASelfAttention,
         )
 
-        _, case2 = self._models(self._official_config(2))
-        _, case3 = self._models(self._official_config(3))
-
-        self.assertTrue(
-            all(
-                isinstance(layer.attention, PackedQKVSDPASelfAttention)
-                for layer in case2.layers
-            )
-        )
-        self.assertTrue(
-            all(
-                type(layer.attention) is StridedSDPASelfAttention
-                for layer in case3.layers
-            )
-        )
+        self.assertEqual(PACKED_QKV_CASES, frozenset((2, 3)))
+        for case_id in (1, 2, 3):
+            with self.subTest(case=case_id):
+                _, candidate = self._models(self._official_config(case_id))
+                expected_type = (
+                    PackedQKVSDPASelfAttention
+                    if case_id in (2, 3)
+                    else StridedSDPASelfAttention
+                )
+                self.assertTrue(
+                    all(
+                        type(layer.attention) is expected_type
+                        for layer in candidate.layers
+                    )
+                )
 
     def test_cpu_fallback_is_bitwise_reference_with_padding(self):
         baseline, candidate = self._models(self.small_config)

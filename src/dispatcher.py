@@ -60,6 +60,7 @@ MIN_COMPILED_CUDA_CAPABILITY = (8, 0)
 VALIDATED_TORCH_VERSION = "2.13.0+cu130"
 VALIDATED_MATMUL_PRECISION = "high"
 VALIDATED_ALLOW_TF32 = True
+PACKED_QKV_CASES = frozenset((2, 3))
 
 
 def _config_key(config: TransformerConfig) -> ConfigKey:
@@ -224,7 +225,7 @@ class DispatchingTransformer(BaselineTransformer):
         super().__init__(config)
         attention_type = (
             PackedQKVSDPASelfAttention
-            if OFFICIAL_CASE_BY_CONFIG.get(_config_key(config)) == 2
+            if OFFICIAL_CASE_BY_CONFIG.get(_config_key(config)) in PACKED_QKV_CASES
             else StridedSDPASelfAttention
         )
         for layer in self.layers:
@@ -576,7 +577,7 @@ CANDIDATE = CandidateSpec(
     model_factory=DispatchingTransformer,
     owner="Person 1 / integrator",
     description=(
-        "Lazy twelve-case float32 CUDA dispatcher: Case-2 packed QKV, "
+        "Lazy twelve-case float32 CUDA dispatcher: Cases 2/3 packed QKV, "
         "strided-view SDPA, shape-specific compilation, and exact fallback."
     ),
     self_compiling=True,
