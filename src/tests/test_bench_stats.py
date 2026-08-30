@@ -44,17 +44,37 @@ class SummariseTimingsTests(unittest.TestCase):
         self.assertAlmostEqual(got["noise"]["aa_discrepancy"], 0.03)
         self.assertGreaterEqual(got["noise"]["minimum_detectable_effect"], 1.03)
 
-    def test_floor_is_never_below_the_within_variant_spread(self):
-        """A tight A/A pair does not license trusting a 1% win on a jittery run."""
+    def test_floor_is_the_a_a_gap_not_the_within_variant_spread(self):
+        """Dispersion of individual samples is not the error of a min-of-N compare.
+
+        Measured at B=2, N=100000: identical code reproduced to 0.6% while its own
+        repetitions varied by 10.3%. Using the spread would set the floor at
+        1.103x and make every fix worth under 10% unmeasurable -- and since
+        (max-min)/min only grows with more repetitions, it would penalise
+        measuring more carefully.
+        """
         from src.bench_poly import summarise_timings
 
         got = summarise_timings(
-            {"poly": [100.0, 130.0], "poly_control": [100.0, 100.0]},
+            {"poly": [100.0, 130.0], "poly_control": [100.0, 128.0]},
             control_pairs=[("poly", "poly_control")],
         )
         self.assertAlmostEqual(got["noise"]["aa_discrepancy"], 0.0)
-        # The 30% within-variant spread must still show up in the floor.
-        self.assertAlmostEqual(got["noise"]["minimum_detectable_effect"], 1.3)
+        self.assertAlmostEqual(got["noise"]["worst_within_variant_spread"], 0.3)
+        self.assertAlmostEqual(got["noise"]["minimum_detectable_effect"], 1.0)
+
+    def test_reports_the_worst_paired_disagreement_as_context(self):
+        """What a one-shot comparison would have suffered, hence why we repeat."""
+        from src.bench_poly import summarise_timings
+
+        got = summarise_timings(
+            {"poly": [100.0, 130.0], "poly_control": [100.0, 104.0]},
+            control_pairs=[("poly", "poly_control")],
+        )
+        # rep 2 had identical code reading 130 against 104.
+        self.assertAlmostEqual(got["noise"]["worst_paired_aa_discrepancy"], 0.25)
+        # ...but the floor still comes from the minima, which agree exactly.
+        self.assertAlmostEqual(got["noise"]["minimum_detectable_effect"], 1.0)
 
     def test_decides_whether_a_measured_ratio_is_reportable(self):
         from src.bench_poly import is_resolvable, summarise_timings

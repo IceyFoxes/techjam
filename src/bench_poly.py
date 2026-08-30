@@ -64,14 +64,18 @@ def summarise_timings(samples, control_pairs=()):
     implementation. The gap between such a pair is a direct measurement of what
     this machine reports as a difference when there is none.
 
-    The floor is the larger of two quantities, because either can invalidate a
-    result on its own:
+    **The floor is the A/A discrepancy between the two minima**, because that is
+    exactly the statistic an A/B compares. It is not the within-variant spread.
+    Measured here at B=2, those two differ by more than an order of magnitude:
+    identical code reproduced to **0.6%** while individual repetitions of it
+    varied by **10.3%**. Folding the spread in would have set the floor at 1.103x
+    and made every fix worth less than 10% unmeasurable -- and since
+    ``(max - min) / min`` only grows as repetitions are added, it would have
+    punished measuring more carefully. The spread is reported alongside as
+    dispersion, which is what it is.
 
-    * the **A/A discrepancy**, how far apart identical code measured, and
-    * the worst **within-variant spread**, ``(max - min) / min``.
-
-    A tight A/A pair does not license trusting a 1% win taken from a run whose
-    own repetitions varied by 30%.
+    The within-variant spread is used as the floor only when there is no control
+    pair, where it is a crude lower bound and better than claiming nothing.
 
     Returned as a ratio: ``minimum_detectable_effect`` of 1.06 means only
     speedups of 1.06x or better (or slowdowns past 1/1.06) are reportable.
@@ -93,17 +97,25 @@ def summarise_timings(samples, control_pairs=()):
         }
 
     discrepancy = None
+    paired = None
     for left, right in control_pairs:
         a, b = variants[left]["min_ms"], variants[right]["min_ms"]
         gap = abs(a - b) / min(a, b)
         discrepancy = gap if discrepancy is None else max(discrepancy, gap)
+        # The worst disagreement between identical code within a single
+        # repetition. Reported as context: it bounds how bad a one-shot
+        # comparison would be, which is why the harness does not do one.
+        for x, y in zip(samples[left], samples[right]):
+            step = abs(x - y) / min(x, y)
+            paired = step if paired is None else max(paired, step)
 
     worst_spread = max((v["spread"] for v in variants.values()), default=0.0)
-    floor = max(worst_spread, discrepancy or 0.0)
+    floor = discrepancy if discrepancy is not None else worst_spread
     return {
         "variants": variants,
         "noise": {
             "aa_discrepancy": discrepancy,
+            "worst_paired_aa_discrepancy": paired,
             "worst_within_variant_spread": worst_spread,
             "minimum_detectable_effect": 1.0 + floor,
         },
@@ -254,8 +266,17 @@ def main() -> int:
         )
     noise = results["noise"]
     aa = noise["aa_discrepancy"]
-    print(f"\nA/A discrepancy:              {'unmeasured' if aa is None else f'{aa:.1%}'}")
-    print(f"worst within-variant spread:  {noise['worst_within_variant_spread']:.1%}")
+    paired = noise["worst_paired_aa_discrepancy"]
+    print(f"\nA/A discrepancy (the floor):  {'unmeasured' if aa is None else f'{aa:.1%}'}")
+    print(
+        "  worst single-rep A/A gap:   "
+        f"{'unmeasured' if paired is None else f'{paired:.1%}'}"
+        "   <- what one unrepeated compare would risk"
+    )
+    print(
+        f"  within-variant spread:      {noise['worst_within_variant_spread']:.1%}"
+        "   <- dispersion, not compare error"
+    )
     print(f"minimum detectable effect:    {floor:.3f}x")
     print(
         f"\nspeedup vs exact flash:       {results['speedup_vs_exact']:.3f}x "

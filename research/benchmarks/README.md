@@ -5,6 +5,15 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx4060-d496539/`](2026-08-30-rtx4060-d496539/README.md): Person 2
+  Phase 2 task **F0**, the noise floor. Measures how large a difference this
+  machine can resolve, using an A/A control — the same callable timed twice as
+  if it were two variants. **Working floor 1.03x**: identical code reproduced to
+  0.6% cool and 2.7% warm. Establishes that the Stage 0 and Stage 1 gates are
+  decidable, that F6 is not measurable at all, and that **both arms of every A/B
+  must run in the same session** — identical code drifted 17.5% between sessions
+  minutes apart. The speedups it reports are a by-product and are **not** a
+  performance claim; they disagree with each other by 17%.
 - [`2026-08-30-rtx4060-6dc9639/`](2026-08-30-rtx4060-6dc9639/README.md): Person 2
   kernel-level **profile** of the Phase 1 polynomial path, taken to decide what
   Phase 2 should target. The two Triton kernels are 51% of GPU time and the

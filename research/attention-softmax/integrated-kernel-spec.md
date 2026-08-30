@@ -121,7 +121,27 @@ path to under 10%, which changes what Stage 1 should target.
 
 ## 4. Stage 0
 
-### F0 — Establish the noise floor (blocking)
+### F0 — Establish the noise floor (blocking) — **DONE, 30 August 2026**
+
+Measured at commit `d496539`. Record:
+[`../benchmarks/2026-08-30-rtx4060-d496539/`](../benchmarks/2026-08-30-rtx4060-d496539/README.md).
+
+**The working floor is 1.03x.** The harness now registers the same callable
+twice as an A/A control and reports the gap between the two minima. Identical
+code reproduced to 0.6% on a cool card and 2.7% on a warm one.
+
+Four consequences, all of which change the rest of this spec:
+
+1. Stage 0's 1.15x gate and Stage 1's 1.4x gate are decidable with wide margin.
+2. **F6 is not measurable and must not be A/B'd** — judge it by kernel and launch
+   counts, or drop it. F2 and F5, at roughly 4% each, sit only marginally above
+   the floor.
+3. **Both arms of every A/B must run in the same session.** `poly_triton`'s own
+   minimum moved 17.5% (315.5 to 370.7 ms) between two runs of identical code
+   minutes apart, which alone would swamp the 1.15x gate.
+4. The floor is re-measured every session, never reused.
+
+The original wording of this task follows.
 
 No A/B in this spec is decidable without it. Extend `src/bench_poly.py` to report,
 alongside each variant's time, the observed spread over `r` interleaved
