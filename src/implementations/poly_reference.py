@@ -73,6 +73,7 @@ def poly_linear_attention(
     quad_update: Optional[Callable] = None,
     causal_diag: Optional[Callable] = None,
     skip_prefix_chunks: bool = True,
+    quad_shadow: bool = True,
 ) -> torch.Tensor:
     """Causal attention with a degree-2 polynomial feature map.
 
@@ -112,6 +113,21 @@ def poly_linear_attention(
     z_lin = torch.zeros(M, D, 1, device=dev, dtype=state_dtype)
     # The denominator's quadratic term does NOT need a d^2 feature state.
     gram = torch.zeros(M, D, D, device=dev, dtype=state_dtype)
+
+    # Read-only float16 copy of the float32 master, maintained by quad_update.
+    # The apply kernel converts the state to float16 internally, so reading this
+    # is bitwise-identical -- and it halves the bytes, which matters because
+    # every apply program reads the WHOLE state, 8 times per chunk at BC=64.
+    # This is not a float16 accumulator; the master above is still float32.
+    s_quad_shadow = (
+        torch.zeros(M, D * D, D, device=dev, dtype=torch.float16)
+        if quad_shadow
+        and quad_apply is not None
+        and quad_update is not None
+        and state_dtype == torch.float32
+        else None
+    )
+    s_quad_view = s_quad if s_quad_shadow is None else s_quad_shadow
 
     # Only the dense path needs the mask. The tiled kernel masks the diagonal
     # tile in registers and never visits the tiles above it.
@@ -161,7 +177,7 @@ def poly_linear_attention(
                     num = num + c2 * (aq @ s_quad.to(cdt)).to(state_dtype)
                     del aq
                 else:
-                    num = num + c2 * quad_apply(af, s_quad).to(state_dtype)
+                    num = num + c2 * quad_apply(af, s_quad_view).to(state_dtype)
 
             # Exact diagonal block. No max subtraction: scores are measured
             # bounded to [-2.203, 2.404], so exp cannot overflow. The guard
@@ -200,7 +216,7 @@ def poly_linear_attention(
             s_quad += (bq.transpose(-2, -1) @ vfc).to(state_dtype)
             del bq
         else:
-            quad_update(bf, vfc, s_quad)
+            quad_update(bf, vfc, s_quad, shadow=s_quad_shadow)
 
     # Early tokens attend to very few keys, where a relative weight error is not
     # damped by averaging, so the max error lives there. Recomputing the first

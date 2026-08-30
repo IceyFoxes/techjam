@@ -43,17 +43,8 @@ if HAS_TRITON:
         """
         return tl.reshape(ai[:, :, None] * a[:, None, :], (BC, BI * D))
 
-    @triton.autotune(
-        configs=[
-            triton.Config({"BC": bc, "BK": bk}, num_warps=w, num_stages=2)
-            for bc in (64, 128)
-            for bk in (64, 128)
-            for w in (4, 8)
-        ],
-        key=["C", "D", "V"],
-    )
     @triton.jit
-    def _causal_diag_kernel(
+    def _causal_diag_body(
         a_ptr, b_ptr, v_ptr, num_ptr, den_ptr,
         stride_am, stride_ac, stride_ad,
         stride_bm, stride_bc, stride_bd,
@@ -124,17 +115,8 @@ if HAS_TRITON:
             mask=mask_c,
         )
 
-    @triton.autotune(
-        configs=[
-            triton.Config({"BC": bc, "BI": bi}, num_warps=w, num_stages=2)
-            for bc in (32, 64)
-            for bi in (1, 2, 4)
-            for w in (4, 8)
-        ],
-        key=["C", "D", "V"],
-    )
     @triton.jit
-    def _quad_apply_kernel(
+    def _quad_apply_body(
         a_ptr, s_ptr, y_ptr,
         stride_am, stride_ac, stride_ad,
         stride_sm, stride_sf, stride_sv,
@@ -180,30 +162,16 @@ if HAS_TRITON:
             mask=mask_c[:, None] & mask_v[None, :],
         )
 
-    @triton.autotune(
-        configs=[
-            triton.Config({"BC": bc, "BI": bi}, num_warps=w, num_stages=2)
-            for bc in (32, 64)
-            for bi in (1, 2)
-            for w in (4, 8)
-        ],
-        key=["C", "D", "V"],
-        # This kernel accumulates into o_ptr in place, and the autotuner runs
-        # each candidate config several times to time it. Without restore_value
-        # every tuning trial folds the chunk in again, so the state comes out
-        # multiplied by the trial count -- and only on the first call for a
-        # given key, since later calls hit the config cache and run once. That
-        # makes it a shape-dependent, cache-order-dependent wrong answer.
-        restore_value=["o_ptr"],
-    )
     @triton.jit
-    def _quad_update_kernel(
-        b_ptr, v_ptr, o_ptr,
+    def _quad_update_body(
+        b_ptr, v_ptr, o_ptr, sh_ptr,
         stride_bm, stride_bc, stride_bd,
         stride_vm, stride_vc, stride_vv,
         stride_om, stride_of, stride_ov,
+        stride_shm, stride_shf, stride_shv,
         C, D: tl.constexpr, V: tl.constexpr,
         BC: tl.constexpr, BI: tl.constexpr, BV: tl.constexpr,
+        HAS_SHADOW: tl.constexpr,
     ):
         pid_i = tl.program_id(0)
         pid_m = tl.program_id(1)
@@ -242,14 +210,189 @@ if HAS_TRITON:
             + offs_f[:, None] * stride_of + offs_v[None, :] * stride_ov
         )
         prev = tl.load(o_addr, mask=mask_v[None, :], other=0.0)
-        tl.store(o_addr, prev + acc, mask=mask_v[None, :])
+        updated = prev + acc
+        tl.store(o_addr, updated, mask=mask_v[None, :])
+        if HAS_SHADOW:
+            # The apply kernel converts to float16 before its dot anyway, so
+            # reading this instead of the master is bitwise-identical and moves
+            # half the bytes -- and every apply program reads the whole state.
+            tl.store(
+                sh_ptr + pid_m * stride_shm
+                + offs_f[:, None] * stride_shf + offs_v[None, :] * stride_shv,
+                updated.to(tl.float16),
+                mask=mask_v[None, :],
+            )
+
+
+    # --- Entry points -------------------------------------------------------
+    #
+    # Each kernel has two: an autotuned one for unknown shapes and devices, and
+    # a static one launched at a configuration measured offline (see
+    # ``src/kernels/poly_configs.py``). Autotune is the wrong default here --
+    # case 14 is a single forward pass, so search time is not amortised and
+    # lands directly in the measured wall clock, and the update kernel has to
+    # clone the 32 MiB state on every trial because it accumulates in place.
+    #
+    # Both entry points call the SAME body, so they cannot drift apart.
+
+    _DIAG_CONFIGS = [
+        triton.Config({"BC": bc, "BK": bk}, num_warps=w, num_stages=2)
+        for bc in (64, 128)
+        for bk in (64, 128)
+        for w in (4, 8)
+    ]
+    _APPLY_CONFIGS = [
+        triton.Config({"BC": bc, "BI": bi}, num_warps=w, num_stages=2)
+        for bc in (32, 64)
+        for bi in (1, 2, 4)
+        for w in (4, 8)
+    ]
+    _UPDATE_CONFIGS = [
+        triton.Config({"BC": bc, "BI": bi}, num_warps=w, num_stages=2)
+        for bc in (32, 64)
+        for bi in (1, 2)
+        for w in (4, 8)
+    ]
+
+    @triton.autotune(configs=_DIAG_CONFIGS, key=["C", "D", "V"])
+    @triton.jit
+    def _causal_diag_kernel(
+        a_ptr, b_ptr, v_ptr, num_ptr, den_ptr,
+        stride_am, stride_ac, stride_ad,
+        stride_bm, stride_bc, stride_bd,
+        stride_vm, stride_vc, stride_vv,
+        stride_nm, stride_nc, stride_nv,
+        stride_dm, stride_dc,
+        C, D: tl.constexpr, V: tl.constexpr,
+        BC: tl.constexpr, BK: tl.constexpr, BV: tl.constexpr,
+    ):
+        _causal_diag_body(
+            a_ptr, b_ptr, v_ptr, num_ptr, den_ptr,
+            stride_am, stride_ac, stride_ad,
+            stride_bm, stride_bc, stride_bd,
+            stride_vm, stride_vc, stride_vv,
+            stride_nm, stride_nc, stride_nv,
+            stride_dm, stride_dc,
+            C, D, V, BC, BK, BV,
+        )
+
+    @triton.jit
+    def _causal_diag_kernel_static(
+        a_ptr, b_ptr, v_ptr, num_ptr, den_ptr,
+        stride_am, stride_ac, stride_ad,
+        stride_bm, stride_bc, stride_bd,
+        stride_vm, stride_vc, stride_vv,
+        stride_nm, stride_nc, stride_nv,
+        stride_dm, stride_dc,
+        C, D: tl.constexpr, V: tl.constexpr,
+        BC: tl.constexpr, BK: tl.constexpr, BV: tl.constexpr,
+    ):
+        _causal_diag_body(
+            a_ptr, b_ptr, v_ptr, num_ptr, den_ptr,
+            stride_am, stride_ac, stride_ad,
+            stride_bm, stride_bc, stride_bd,
+            stride_vm, stride_vc, stride_vv,
+            stride_nm, stride_nc, stride_nv,
+            stride_dm, stride_dc,
+            C, D, V, BC, BK, BV,
+        )
+
+    @triton.autotune(configs=_APPLY_CONFIGS, key=["C", "D", "V"])
+    @triton.jit
+    def _quad_apply_kernel(
+        a_ptr, s_ptr, y_ptr,
+        stride_am, stride_ac, stride_ad,
+        stride_sm, stride_sf, stride_sv,
+        stride_ym, stride_yc, stride_yv,
+        C, D: tl.constexpr, V: tl.constexpr,
+        BC: tl.constexpr, BI: tl.constexpr, BV: tl.constexpr,
+    ):
+        _quad_apply_body(
+            a_ptr, s_ptr, y_ptr,
+            stride_am, stride_ac, stride_ad,
+            stride_sm, stride_sf, stride_sv,
+            stride_ym, stride_yc, stride_yv,
+            C, D, V, BC, BI, BV,
+        )
+
+    @triton.jit
+    def _quad_apply_kernel_static(
+        a_ptr, s_ptr, y_ptr,
+        stride_am, stride_ac, stride_ad,
+        stride_sm, stride_sf, stride_sv,
+        stride_ym, stride_yc, stride_yv,
+        C, D: tl.constexpr, V: tl.constexpr,
+        BC: tl.constexpr, BI: tl.constexpr, BV: tl.constexpr,
+    ):
+        _quad_apply_body(
+            a_ptr, s_ptr, y_ptr,
+            stride_am, stride_ac, stride_ad,
+            stride_sm, stride_sf, stride_sv,
+            stride_ym, stride_yc, stride_yv,
+            C, D, V, BC, BI, BV,
+        )
+
+    @triton.autotune(
+        configs=_UPDATE_CONFIGS,
+        key=["C", "D", "V"],
+        # This kernel accumulates into o_ptr (and sh_ptr) in place, and the
+        # autotuner runs each candidate several times to time it. Without
+        # restore_value every trial folds the chunk in again, so the state comes
+        # out multiplied by the trial count -- and only on the first call for a
+        # given key, since later calls hit the config cache and run once. That
+        # makes it a shape-dependent, cache-order-dependent wrong answer.
+        restore_value=["o_ptr", "sh_ptr"],
+    )
+    @triton.jit
+    def _quad_update_kernel(
+        b_ptr, v_ptr, o_ptr, sh_ptr,
+        stride_bm, stride_bc, stride_bd,
+        stride_vm, stride_vc, stride_vv,
+        stride_om, stride_of, stride_ov,
+        stride_shm, stride_shf, stride_shv,
+        C, D: tl.constexpr, V: tl.constexpr,
+        BC: tl.constexpr, BI: tl.constexpr, BV: tl.constexpr,
+        HAS_SHADOW: tl.constexpr,
+    ):
+        _quad_update_body(
+            b_ptr, v_ptr, o_ptr, sh_ptr,
+            stride_bm, stride_bc, stride_bd,
+            stride_vm, stride_vc, stride_vv,
+            stride_om, stride_of, stride_ov,
+            stride_shm, stride_shf, stride_shv,
+            C, D, V, BC, BI, BV, HAS_SHADOW,
+        )
+
+    @triton.jit
+    def _quad_update_kernel_static(
+        b_ptr, v_ptr, o_ptr, sh_ptr,
+        stride_bm, stride_bc, stride_bd,
+        stride_vm, stride_vc, stride_vv,
+        stride_om, stride_of, stride_ov,
+        stride_shm, stride_shf, stride_shv,
+        C, D: tl.constexpr, V: tl.constexpr,
+        BC: tl.constexpr, BI: tl.constexpr, BV: tl.constexpr,
+        HAS_SHADOW: tl.constexpr,
+    ):
+        _quad_update_body(
+            b_ptr, v_ptr, o_ptr, sh_ptr,
+            stride_bm, stride_bc, stride_bd,
+            stride_vm, stride_vc, stride_vv,
+            stride_om, stride_of, stride_ov,
+            stride_shm, stride_shf, stride_shv,
+            C, D, V, BC, BI, BV, HAS_SHADOW,
+        )
 
 
 def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
     """``phi2(a) @ s`` without materialising ``phi2(a)``.
 
-    ``a`` is ``[M, C, D]`` (float16), ``s`` is ``[M, D*D, V]`` (float32).
-    Returns ``[M, C, V]`` in ``a``'s dtype.
+    ``a`` is ``[M, C, D]`` (float16), ``s`` is ``[M, D*D, V]`` float32 **or
+    float16**. Returns ``[M, C, V]`` in ``a``'s dtype.
+
+    A float16 ``s`` gives a bitwise-identical result, because the kernel
+    converts the state to float16 before its dot regardless -- see
+    ``quad_update``'s ``shadow`` argument.
     """
     if not HAS_TRITON:
         raise RuntimeError("Triton is not available")
@@ -274,12 +417,24 @@ def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
     return y
 
 
-def quad_update(b: torch.Tensor, v: torch.Tensor, out: torch.Tensor) -> None:
+def quad_update(
+    b: torch.Tensor,
+    v: torch.Tensor,
+    out: torch.Tensor,
+    shadow: torch.Tensor | None = None,
+) -> None:
     """Accumulate ``phi2(b)^T @ v`` into ``out`` in place.
 
     ``b`` is ``[M, C, D]`` float16, ``v`` is ``[M, C, V]`` float16, and ``out``
     is ``[M, D*D, V]`` float32. ``out`` is the running state, so this adds
     rather than overwrites.
+
+    ``shadow``, when given, is a float16 tensor shaped like ``out`` that
+    receives the updated state rounded to float16. ``quad_apply`` can then read
+    it instead of the master and move half the bytes, which matters because
+    every apply program reads the *whole* state -- 8 times per chunk at
+    ``BC=64, C=512``. This is not an fp16 accumulator: the master stays float32
+    and the shadow is derived from it every time.
     """
     if not HAS_TRITON:
         raise RuntimeError("Triton is not available")
@@ -292,16 +447,26 @@ def quad_update(b: torch.Tensor, v: torch.Tensor, out: torch.Tensor) -> None:
         # fails at N=65536 with over a million failures, so it must fail loudly
         # here rather than compute something plausible.
         raise ValueError("the master state must be float32; see the module docstring")
+    if shadow is not None:
+        if shadow.shape != out.shape or shadow.dtype != torch.float16:
+            raise ValueError(
+                f"shadow must be float16 shaped {tuple(out.shape)}, "
+                f"got {shadow.dtype} {tuple(shadow.shape)}"
+            )
     b = b.contiguous()
     v = v.contiguous()
+    # When there is no shadow the kernel still needs a valid pointer, so `out`
+    # is passed twice and HAS_SHADOW switches the store off at compile time.
+    target = shadow if shadow is not None else out
     BV = max(16, triton.next_power_of_2(V))
     grid = lambda meta: (triton.cdiv(D, meta["BI"]), M)  # noqa: E731
     _quad_update_kernel[grid](
-        b, v, out,
+        b, v, out, target,
         b.stride(0), b.stride(1), b.stride(2),
         v.stride(0), v.stride(1), v.stride(2),
         out.stride(0), out.stride(1), out.stride(2),
-        C, D, V, BV=BV,
+        target.stride(0), target.stride(1), target.stride(2),
+        C, D, V, BV=BV, HAS_SHADOW=shadow is not None,
     )
 
 

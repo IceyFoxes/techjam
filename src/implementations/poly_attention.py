@@ -42,7 +42,7 @@ def poly_attention_forward(
     pre-optimization path can run as a second arm in the SAME benchmarking
     session. Identical code drifted 17.5% between sessions on this hardware, so
     a cross-session A/B is not a measurement. Recognised names: ``"diag"``,
-    ``"prefix"``.
+    ``"prefix"``, ``"shadow"``.
     """
     apply_fn = update_fn = diag_fn = None
     if use_triton and HAS_TRITON and q.is_cuda and q.dtype == torch.float16:
@@ -66,4 +66,5 @@ def poly_attention_forward(
         quad_update=update_fn,
         causal_diag=diag_fn,
         skip_prefix_chunks="prefix" not in disable,
+        quad_shadow="shadow" not in disable,
     )
