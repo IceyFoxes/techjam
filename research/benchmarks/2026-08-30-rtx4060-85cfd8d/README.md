@@ -19,6 +19,16 @@ The control reproduces upstream `StridedSDPASelfAttention`
 against what the shared module does today — not against the eager reference.
 Both are compared to the immutable reference for correctness.
 
+> **Selector removed after these runs (30 August 2026).**
+> `attention:KEYMASK_CANDIDATE` was deleted so `src/implementations/attention.py`
+> exports exactly one candidate. The commands recorded in this document and in
+> the JSON files are what was actually executed and are left unedited, but the
+> keep-mask half is no longer reproducible through `src.benchmark`. The
+> equivalent control is now `Route.SDPA_CAUSAL_KEYMASK`, which is the
+> construction default of `MaskRoutedSDPASelfAttention`, or
+> `drop_key_mask=False` on the dispatcher — the method the compiled A/B below
+> already uses.
+
 ## Environment
 
 | Field | Value |

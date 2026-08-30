@@ -156,11 +156,8 @@ class AttentionCandidate(BaselineTransformer):
     never move inside a compiled or graph-replayed region.
     """
 
-    def __init__(
-        self, config: TransformerConfig, prefer_keymask: bool = False
-    ) -> None:
+    def __init__(self, config: TransformerConfig) -> None:
         super().__init__(config)
-        self.prefer_keymask = prefer_keymask
         for layer in self.layers:
             layer.attention = MaskRoutedSDPASelfAttention(
                 config.d_model, config.num_heads
@@ -176,15 +173,10 @@ class AttentionCandidate(BaselineTransformer):
             x.dtype == torch.float32,
             self.config.causal,
             classify_mask(valid_token_mask),
-            prefer_keymask=self.prefer_keymask,
         )
         for layer in self.layers:
             layer.attention.route = route
         return super().forward(x, valid_token_mask)
-
-
-def _keymask_factory(config: TransformerConfig) -> AttentionCandidate:
-    return AttentionCandidate(config, prefer_keymask=True)
 
 
 CANDIDATE = CandidateSpec(
@@ -192,11 +184,4 @@ CANDIDATE = CandidateSpec(
     model_factory=AttentionCandidate,
     owner="Person 2",
     description="Mask-routed float32 SDPA with an exact eager fallback.",
-)
-
-KEYMASK_CANDIDATE = CandidateSpec(
-    name="attention-keymask",
-    model_factory=_keymask_factory,
-    owner="Person 2",
-    description="Mask-routed SDPA retaining the broadcast key mask; A/B control.",
 )
