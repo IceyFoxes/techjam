@@ -91,7 +91,20 @@ def main() -> int:
         "--scale-qk",
         type=float,
         default=1.0,
-        help="multiply the input, to sweep sigma (Task 7)",
+        help=(
+            "multiply the input. NOTE: this does NOT move sigma -- the first "
+            "op in every layer is LayerNorm, which is scale-invariant. Use "
+            "--scale-qk-weights to sweep sigma."
+        ),
+    )
+    parser.add_argument(
+        "--scale-qk-weights",
+        type=float,
+        default=1.0,
+        help=(
+            "scale the q_proj and k_proj weights of BOTH models, which scales "
+            "scores by the square of this factor. This is the sigma sweep."
+        ),
     )
     args = parser.parse_args()
 
@@ -103,6 +116,20 @@ def main() -> int:
     )
     candidate = _build(_PolyAttention, config, device)
     copy_model_weights(oracle, candidate)
+
+    if args.scale_qk_weights != 1.0:
+        # Scale Q/K projections in BOTH models so they still compute the same
+        # function; only the score magnitude, and therefore sigma, changes.
+        # This is how a trained model's larger scores are simulated.
+        with torch.no_grad():
+            for model in (oracle, candidate):
+                for layer in model.layers:
+                    for projection in (
+                        layer.attention.q_proj,
+                        layer.attention.k_proj,
+                    ):
+                        projection.weight.mul_(args.scale_qk_weights)
+                        projection.bias.mul_(args.scale_qk_weights)
 
     torch.manual_seed(args.seed)
     x = torch.randn(1, args.n, D_MODEL, device=device, dtype=torch.float16)
@@ -119,7 +146,7 @@ def main() -> int:
     failures = int((err > tol).sum())
     sigma = candidate.layers[0].attention.measured_sigma
     print(
-        f"N={args.n} oracle={args.oracle} scale_qk={args.scale_qk} "
+        f"N={args.n} oracle={args.oracle} wscale={args.scale_qk_weights} "
         f"sigma={sigma:.4f} failures={failures}/{err.numel()} "
         f"max={err.max().item():.4e} rms={err.pow(2).mean().sqrt().item():.4e} "
         f"{'PASS' if failures == 0 else 'FAIL'}"
