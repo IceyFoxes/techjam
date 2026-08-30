@@ -6,9 +6,9 @@ unless promoted to a checkpoint or needed to document a regression.
 ## Current Runs
 
 - [`2026-08-30-rtx4060-poly/`](2026-08-30-rtx4060-poly/README.md): Person 2 fused
-  polynomial attention kernel, Phase 1 acceptance. **2.41x at the real chunk
-  shape (B=2, N=100000): 591.6 ms against 1426.4 ms exact flash**, with peak-VRAM
-  overhead cut from +6773 MiB to +131 MiB. Zero failed elements against the dense reference at N=4096/8192 and
+  polynomial attention kernel, Phase 1 acceptance. **4.31x at the real chunk
+  shape (B=2, N=100000): 328.1 ms against 1414.0 ms exact flash**, with peak-VRAM
+  overhead cut from +6773 MiB to +67 MiB. Zero failed elements against the dense reference at N=4096/8192 and
   against an exact-flash oracle to N=100000 (0 / 102,400,000). Includes the
   sigma-guard calibration sweep. Attention core only; case 14 cannot run end to
   end on an 8 GiB card, and the route is an approximation guarded at runtime.

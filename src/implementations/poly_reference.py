@@ -103,7 +103,8 @@ def poly_linear_attention(
     s_quad = torch.zeros(M, D * D, D, device=dev, dtype=state_dtype)
     z_const = torch.zeros(M, 1, 1, device=dev, dtype=state_dtype)
     z_lin = torch.zeros(M, D, 1, device=dev, dtype=state_dtype)
-    z_quad = torch.zeros(M, D * D, 1, device=dev, dtype=state_dtype)
+    # The denominator's quadratic term does NOT need a d^2 feature state.
+    gram = torch.zeros(M, D, D, device=dev, dtype=state_dtype)
 
     blocked_full = torch.ones(chunk, chunk, device=dev, dtype=torch.bool).triu(1)
 
@@ -127,42 +128,48 @@ def poly_linear_attention(
                 c0 * z_const.expand(M, C, 1)
                 + c1 * (af @ z_lin.to(cdt)).to(state_dtype)
             )
+            den = den + c2 * (
+                (af @ gram.to(cdt)) * af
+            ).sum(-1, keepdim=True).to(state_dtype)
             if quad_apply is None:
                 aq = phi2(af)
                 num = num + c2 * (aq @ s_quad.to(cdt)).to(state_dtype)
-                den = den + c2 * (aq @ z_quad.to(cdt)).to(state_dtype)
                 del aq
             else:
                 num = num + c2 * quad_apply(af, s_quad).to(state_dtype)
-                den = den + c2 * quad_apply(af, z_quad).to(state_dtype)
 
         # Exact diagonal block. No max subtraction: scores are measured bounded
         # to [-2.203, 2.404], so exp cannot overflow. The guard keeps that true.
-        sc = (a @ b.transpose(-2, -1)).to(torch.float32)
+        #
+        # Kept in the compute dtype end to end. Upcasting to float32 here forced
+        # the PV product onto an fp32 SGEMM, off the tensor cores, and tripled
+        # the traffic of the [M, C, C] block through exp, the mask and the row
+        # sum. Profiled at 195 ms of 547 -- more than both Triton kernels
+        # combined -- and worth 1.71x on its own at N=100000, B=2. Only the row
+        # sum accumulates in float32, where ~512 terms of order 1 would
+        # otherwise lose bits.
         blocked = blocked_full if C == chunk else blocked_full[:C, :C]
-        w = torch.exp(sc).masked_fill(blocked, 0.0)
-        num = num + (w @ vc.to(torch.float32)).to(state_dtype)
-        den = den + w.sum(-1, keepdim=True).to(state_dtype)
-        del sc, w
+        w = torch.exp(a @ b.transpose(-2, -1)).masked_fill_(blocked, 0.0)
+        num = num + (w @ vc).to(state_dtype)
+        den = den + w.sum(-1, keepdim=True, dtype=torch.float32).to(state_dtype)
+        del w
 
         out[:, :, t0:t1] = (num / den).to(q.dtype).reshape(B, H, C, D)
         del num, den
 
         bf = b.to(cdt)
         vfc = vc.to(cdt)
-        ones = torch.ones(M, C, 1, device=dev, dtype=cdt)
         s_const += vfc.sum(1, keepdim=True).to(state_dtype)
         z_const += float(C)
         s_lin += (bf.transpose(-2, -1) @ vfc).to(state_dtype)
         z_lin += bf.sum(1).unsqueeze(-1).to(state_dtype)
+        gram += (bf.transpose(-2, -1) @ bf).to(state_dtype)
         if quad_update is None:
             bq = phi2(bf)
             s_quad += (bq.transpose(-2, -1) @ vfc).to(state_dtype)
-            z_quad += (bq.transpose(-2, -1) @ ones).to(state_dtype)
             del bq
         else:
             quad_update(bf, vfc, s_quad)
-            quad_update(bf, ones, z_quad)
 
     # Early tokens attend to very few keys, where a relative weight error is not
     # damped by averaging, so the max error lives there. Recomputing the first

@@ -1,0 +1,49 @@
+{
+  "acceptance_threshold_speedup": 2.0,
+  "config": {
+    "batch": 1,
+    "dtype": "float16",
+    "head_dim": 64,
+    "heads": 16,
+    "layers": 1,
+    "n": 100000,
+    "reps": 4
+  },
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 832748486656,
+      "path": "/home/izo/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU"
+    },
+    "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python": "3.12.14",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "c97b2c4fd923006d289a0eacb4c529b01ad5146c",
+    "dirty": true,
+    "status": "M src/implementations/poly_reference.py"
+  },
+  "results": {
+    "accepted": true,
+    "beats_pytorch_poly": true,
+    "exact_flash_ms": 711.9254689996524,
+    "peak_mib": {
+      "exact_flash": 201.4169921875,
+      "poly_overhead": 31.68505859375,
+      "poly_triton": 233.10205078125
+    },
+    "poly_pytorch_ms": 428.0542520000381,
+    "poly_triton_ms": 269.91574199928436,
+    "speedup_vs_exact": 2.637584098379634,
+    "speedup_vs_pytorch_poly": 1.5858810191262316
+  },
+  "schema_version": 1
+}

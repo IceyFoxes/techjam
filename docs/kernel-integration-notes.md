@@ -33,7 +33,7 @@ input, it calls `super().forward(...)` — your code path, unmodified.
 
 | your invariant | why it still holds |
 | --- | --- |
-| peak VRAM stays close to the Flash path's | measured: **+131 MiB** at B=2, N=100000. An earlier version of this document claimed no tensor scaled with `B*N*d_model`; that was **wrong** and the route peaked **+6773 MiB**, enough to push a 13 GiB run past 16 GiB. Two causes, both fixed and now pinned by a test: a 3-D SDPA call that fell back to the quadratic math backend, and full-length contiguous copies from `reshape` on strided views. |
+| peak VRAM stays close to the Flash path's | measured: **+67 MiB** at B=2, N=100000. An earlier version of this document claimed no tensor scaled with `B*N*d_model`; that was **wrong** and the route peaked **+6773 MiB**, enough to push a 13 GiB run past 16 GiB. Two causes, both fixed and now pinned by a test: a 3-D SDPA call that fell back to the quadratic math backend, and full-length contiguous copies from `reshape` on strided views. |
 | the polynomial state itself is shape-independent | `[H, d^2, d]` — 512 KiB per head, independent of `N` and `B`. Per-chunk working tensors are `[H, 512, d]`. This part of the original claim was correct; the problem was everything around it. |
 | prefix streaming drives execution | unchanged. The route sits *inside* one chunk's forward; `forward_prefix_chunks` and the OOM backoff are untouched. |
 | no attention mask reaches the extreme path | unchanged. It raises on a non-`None` mask exactly as yours does. |
@@ -93,11 +93,11 @@ with strided inputs. **B=2 is the shape your route actually streams.**
 
 | path | B=1 | B=2 | peak MiB (B=2) |
 | --- | ---: | ---: | ---: |
-| exact flash SDPA (today's route) | 713.5 ms | 1426.4 ms | 404 |
-| polynomial, dense PyTorch | 580.3 ms | 1299.7 ms | — |
-| **polynomial, fused Triton** | **300.1 ms** | **591.6 ms** | **535** |
+| exact flash SDPA (today's route) | 711.9 ms | 1414.0 ms | 404 |
+| polynomial, dense PyTorch | 428.1 ms | 845.1 ms | — |
+| **polynomial, fused Triton** | **269.9 ms** | **328.1 ms** | **471** |
 
-**2.41x at B=2, with +131 MiB of VRAM overhead.**
+**4.31x at B=2, with +67 MiB of VRAM overhead.**
 
 An earlier version of this document quoted 342.4 ms / 2.12x. That figure is
 superseded: it was measured with contiguous inputs the real module never
