@@ -5,6 +5,16 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-31-rtx5080-775c820/`](2026-08-31-rtx5080-775c820/README.md):
+  **final fourteen-case submission matrix**. Cases 1-13 pass 65/65 accuracy
+  trials with zero failures and a 3.611x geometric-mean speedup; Case 14 passes
+  5/5 streamed FP32-oracle trials with zero failures across 16.384 billion
+  elements and an 8.972x diagnostic ratio. No latest-vs-base regression exceeds
+  2.14%.
+- [`2026-08-31-rtx5080-3e6a3ea/`](2026-08-31-rtx5080-3e6a3ea/README.md):
+  final immutable-reference A/A controls and branch-base dispatcher matrix for
+  Cases 1-13. All 65 base accuracy trials pass; Case 14 is explicitly
+  unsupported in FP32 at this base revision.
 - [`2026-08-30-rtx5080-27af97d/`](2026-08-30-rtx5080-27af97d/README.md):
   the editable benchmark's new FP32 Case-14 dispatcher route passes the streamed
   FP32 oracle on 5/5 trials: zero failures across 16,384,000,000 elements,
