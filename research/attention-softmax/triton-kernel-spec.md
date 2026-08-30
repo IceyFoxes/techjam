@@ -299,13 +299,24 @@ before the candidate, and case 14's dense baseline is not runnable on any GPU. I
 that is not resolved, none of this work is scored. It should be pursued in
 parallel and does not block Phase 1.
 
-## 10. Handoffs
+## 10. Cross-stream integration
 
-- **Person 4** owns case 14's memory route. Promotion into that route touches
-  `src/implementations/extreme.py` and must be agreed, not landed unilaterally.
-- **Person 1** owns compilation and dispatch. The guard's host synchronization
-  must stay outside any compiled or graph-replayed region.
-- No change to cases 1-13; nothing here affects the merged mask-routing work.
+Integration into the case-14 route is **in scope for this work**, not handed off.
+Person 2 makes the code changes; the repository owner carries the human
+coordination with Persons 1 and 4. Each touched file records what changed and why
+so the owning stream can review it as a diff rather than a surprise.
+
+| file | owner | change | constraint that must hold |
+| --- | --- | --- | --- |
+| `src/implementations/extreme.py` | Person 4 | case-14 attention module gains a polynomial route with a flash fallback | the memory contract is unchanged: no new resident tensor scales with `B*N*d_model`, and the existing prefix-streaming and OOM backoff still drive execution |
+| `src/dispatcher.py` | Person 1 | case-14 route may select the polynomial backend | the guard's host synchronization stays in the eager dispatch layer, never inside a compiled or graph-replayed region |
+| `docs/kernel-integration-notes.md` | Person 2 | written for Persons 1 and 4 | states the two constraints above, the measured evidence, and how to disable the route in one line |
+
+**Non-negotiable across both:** the polynomial route is opt-in and reversible.
+Setting one flag returns case 14 to exactly today's forced-Flash behaviour, and
+that path is covered by a test so it cannot rot.
+
+Cases 1-13 are untouched; nothing here affects the merged mask-routing work.
 
 ## 11. Sources
 
