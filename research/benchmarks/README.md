@@ -47,10 +47,10 @@ unless promoted to a checkpoint or needed to document a regression.
 - [`2026-08-30-rtx5080-8567f3f-sm120/`](2026-08-30-rtx5080-8567f3f-sm120/README.md):
   PR #16 Case 14 RTX 5080 promotion. The measured one-kernel policy passes the
   dense N=8192 and Flash N=100000 oracles with zero failures and completes the
-  official full shape at 11.407-11.693 s cold. Against the fastest 14.680 s
-  same-code exact control, the conservative cold speedup is **1.255x**, with
-  equal 13,931.858 MiB peak allocation. Records full-fusion and one-kernel
-  rejections, empty-cache cold/warm runs, and 200 passing tests.
+  official full shape at 11.407-14.545 s cold. A post-merge, order-reversed
+  bracket measured **1.462-1.530x** over exact Flash, with equal 13,931.858 MiB
+  peak allocation. Records full-fusion and one-kernel rejections, empty-cache
+  cold/warm runs, and 200 passing tests.
 - [`2026-08-30-rtx5080-fecf994/#case-6-full-official-comparison`](2026-08-30-rtx5080-fecf994/README.md#case-6-full-official-comparison):
   official Case 6 float32 comparison on the RTX 5080. The memory-safe dispatcher
   passes 5/5 seeds with zero failed elements, improves latency from 354.862 ms
