@@ -1,0 +1,44 @@
+{
+  "acceptance_threshold_ms": 360.0,
+  "config": {
+    "batch": 1,
+    "dtype": "float16",
+    "head_dim": 64,
+    "heads": 16,
+    "layers": 1,
+    "n": 100000,
+    "reps": 10
+  },
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665699975168,
+      "path": "/tmp/techjam-pr16-ab",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "b9506f37e5bee2485519eb9174fb2cbc8b6f91da",
+    "dirty": false,
+    "status": ""
+  },
+  "results": {
+    "accepted": true,
+    "beats_pytorch_poly": true,
+    "exact_flash_ms": 200.00632400478935,
+    "poly_pytorch_ms": 235.93646299559623,
+    "poly_triton_ms": 128.10362500022165,
+    "speedup_vs_exact": 1.5612854359464323,
+    "speedup_vs_pytorch_poly": 1.8417625808417832
+  },
+  "schema_version": 1
+}

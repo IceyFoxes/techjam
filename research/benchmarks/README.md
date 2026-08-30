@@ -44,6 +44,32 @@ unless promoted to a checkpoint or needed to document a regression.
   against an exact-flash oracle to N=100000 (0 / 102,400,000). Includes the
   sigma-guard calibration sweep. Attention core only; case 14 cannot run end to
   end on an 8 GiB card, and the route is an approximation guarded at runtime.
+- [`2026-08-30-rtx5080-8567f3f-sm120/`](2026-08-30-rtx5080-8567f3f-sm120/README.md):
+  PR #16 Case 14 RTX 5080 promotion. The measured one-kernel policy passes the
+  dense N=8192 and Flash N=100000 oracles with zero failures and completes the
+  official full shape at 11.407-11.693 s cold. Against the fastest 14.680 s
+  same-code exact control, the conservative cold speedup is **1.255x**, with
+  equal 13,931.858 MiB peak allocation. Records full-fusion and one-kernel
+  rejections, empty-cache cold/warm runs, and 200 passing tests.
+- [`2026-08-30-rtx5080-fecf994/#case-6-full-official-comparison`](2026-08-30-rtx5080-fecf994/README.md#case-6-full-official-comparison):
+  official Case 6 float32 comparison on the RTX 5080. The memory-safe dispatcher
+  passes 5/5 seeds with zero failed elements, improves latency from 354.862 ms
+  to 149.436 ms (**2.375x**), and reduces process peak allocation from
+  10,672.719 MiB to 2,312.512 MiB. A reference-versus-reference control is
+  approximately neutral at 1.010x.
+- [`2026-08-30-rtx5080-b9506f3/`](2026-08-30-rtx5080-b9506f3/README.md):
+  PR #16 Case 14 three-reference validation. The standalone fused polynomial
+  attention core is 1.561x faster than exact Flash and passes reduced dense and
+  full-length Flash-oracle checks. However, the submitted dispatcher never
+  selects it; when locally wired, full Case 14 is **16.886x slower** and uses
+  2.58 GiB more peak allocation than the branch-base Flash route on this 16 GiB
+  RTX 5080. Treat the kernel speedup as microbenchmark-only and do not merge the
+  PR as-is.
+- [`2026-08-30-rtx5080-ce3f7f2/`](2026-08-30-rtx5080-ce3f7f2/README.md):
+  PR #15 three-reference validation after integrating current `master`. Case 3
+  improves 1.218x over the branch-base dispatcher and passes 60/60 stress
+  trials; Case 2 has no regression. Includes clean immutable and branch-base
+  controls under [`2026-08-30-rtx5080-fecf994/`](2026-08-30-rtx5080-fecf994/README.md).
 - [`2026-08-30-rtx4060-85cfd8d/`](2026-08-30-rtx4060-85cfd8d/README.md): Person 2
   attention mask-route sweep on the pinned cu130 stack. All twelve in-scope
   cases x `padding_ratio` 0.0/0.3 x two routes, 5/5 seeds each with zero failed

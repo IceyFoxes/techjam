@@ -1,0 +1,51 @@
+{
+  "batch_chunk_size": 1,
+  "command": "/home/kevin/techjam/.venv/bin/python /tmp/techjam-pr15-base/src/extreme_smoke.py --case 14 --dtype float16 --seed 1234 --output /home/kevin/techjam/research/benchmarks/2026-08-30-rtx5080-b9506f3/full-case14-exact-flash.json",
+  "config": {
+    "batch_size": 32,
+    "causal": true,
+    "d_model": 1024,
+    "ffn_dim": 1024,
+    "num_heads": 16,
+    "num_layers": 2,
+    "seq_len": 100000
+  },
+  "dtype": "float16",
+  "elapsed_seconds": 16.886240263993386,
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665657589760,
+      "path": "/tmp/techjam-pr15-base",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "fecf9943d7cbf4b5e166862087a4a3bb6e21d868",
+    "dirty": false,
+    "status": ""
+  },
+  "numerical_correctness": "not checked: immutable Case 14 baseline is not runnable at this scale",
+  "official_case_id": 14,
+  "output_finite": true,
+  "output_shape": [
+    32,
+    100000,
+    1024
+  ],
+  "padding_ratio": 0.0,
+  "peak_allocated_bytes": 14608612352,
+  "peak_reserved_bytes": 14650703872,
+  "route": "extreme-memory",
+  "schema_version": 1,
+  "timestamp_utc": "2026-08-30T04:25:26.703253+00:00"
+}
