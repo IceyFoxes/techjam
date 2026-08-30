@@ -5,6 +5,18 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx4060-stage0/`](2026-08-30-rtx4060-stage0/README.md): Person 2
+  Phase 2 **Stage 0**, accepted. **1.439x over the Phase 1 kernel (328.1 ->
+  228.0 ms at B=2), and 6.135x over exact Flash**, with peak VRAM overhead down
+  from +67.1 to +61.4 MiB and zero failed elements at all six oracle points. The
+  exact diagonal block fell from 25-35% of the path to 5.0%. Records six
+  individually A/B'd fixes including two rejections, and two findings that
+  changed decisions: **`SIGMA_CEILING` was lowered from 0.45 to 0.40** because
+  Stage 0's own numerics moved the accuracy boundary, and **Design B (the
+  persistent-slab scan) is rejected with evidence** because the feature-map
+  kernels now run at 24-27 TFLOPS against Flash's realised 28 and are no longer
+  traffic-limited.
+
 - [`2026-08-30-rtx4060-d496539/`](2026-08-30-rtx4060-d496539/README.md): Person 2
   Phase 2 task **F0**, the noise floor. Measures how large a difference this
   machine can resolve, using an A/A control — the same callable timed twice as

@@ -6,9 +6,33 @@ the two feature-map kernels — is specified in
 on branch `fused-kernal`, measured at **328.1 ms / 4.31x over exact Flash at
 B=2**.
 
-Status: draft as of 30 August 2026. Author: Person 2.
+Status: **Stage 0 complete and accepted, 30 August 2026.** Author: Person 2.
 Motivating measurements:
 [`../benchmarks/2026-08-30-rtx4060-6dc9639/`](../benchmarks/2026-08-30-rtx4060-6dc9639/).
+
+**Outcome so far.** Stage 0 delivered **1.439x** (328.1 -> 228.0 ms at B=2),
+taking the route from 4.31x to **6.135x** over exact Flash, with peak VRAM
+overhead down from +67.1 to +61.4 MiB and zero correctness failures at every
+tested `N`. Record:
+[`../benchmarks/2026-08-30-rtx4060-stage0/`](../benchmarks/2026-08-30-rtx4060-stage0/README.md).
+
+| task | outcome |
+| --- | --- |
+| F0 noise floor | done; working floor 1.03x |
+| F1 causal-tiled diagonal block | **1.143x** — the diagonal fell from 25-35% of the path to **5.0%** |
+| F2 skip prefixed chunks | kept, unmeasured (4% against an 11.2% floor that session) |
+| F3 float16 quadratic-state shadow | **1.054x**, marginal |
+| F4 measured launch configurations | kept on sweep evidence; best config was outside the shipped autotune space in all three kernels |
+| F5 small-state shadows, scalar `z_const` | **1.029x**, marginal |
+| F6 hoist the redundant `ai` load | **rejected — 19x slower** |
+
+Two findings changed decisions rather than merely being recorded:
+
+1. **`SIGMA_CEILING` was lowered from 0.45 to 0.40.** F1's kernel computes `exp`
+   in float32 where the dense block rounded to float16, which moved the accuracy
+   boundary down: `sigma 0.4808` passed before Stage 0 and fails after it. The
+   old ceiling would have admitted failing configurations. See section 6.1.
+2. **Design B is rejected with evidence.** See section 5.3.
 
 **This spec supersedes section 8 of [`triton-kernel-spec.md`](triton-kernel-spec.md).**
 That section proposed a two-level sequence-parallel scan. Section 7.1 below
@@ -351,7 +375,29 @@ The numerator needs a reduction across the `D/BI` programs, which means either
 fp32 atomics into an `[M, N, V]` buffer (**+819 MiB**) or a partial-write scheme
 with a second pass.
 
-**Design B is built only if both gates pass on Stage 0's re-profile:**
+**REJECTED, 30 August 2026, on Stage 0's re-profile. Design B will not be
+built.** Both gates fail.
+
+*Gate 1 — is state traffic still the top cost? No.* The two feature-map kernels
+are certainly the top cost, at 66% of the path, up from 51%. But Design B removes
+*state traffic*, and after F3's float16 shadow and F4's `BC=128` the kernels are
+no longer traffic-limited: `_quad_update_kernel` realises **24.1 TFLOPS** and
+`_quad_apply_kernel` **27.4 TFLOPS**, against the roughly 28 TFLOPS exact Flash
+achieves on this card. They are running at the machine's achieved throughput, so
+what remains is arithmetic. Removing traffic cannot buy back time that is not
+being spent on it.
+
+*Gate 2 — does the VRAM fit? No.* The `[M, N, V]` float32 partial buffer is
+**+819 MiB** against a route whose overhead is +61.4 MiB and a ceiling of +100.
+
+This spec anticipated the outcome: "the traffic B removes is largely L2 traffic,
+not HBM traffic". It is recorded as a rejection with evidence, which section 5.3
+always said was a legitimate result.
+
+The original gate conditions follow.
+
+**Design B would have been built only if both gates passed on Stage 0's
+re-profile:**
 
 1. State traffic is still the top cost after F1 and F3, and
 2. its projected peak VRAM overhead fits the section 6.3 budget.

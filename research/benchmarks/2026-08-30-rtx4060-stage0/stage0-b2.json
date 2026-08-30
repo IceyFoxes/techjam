@@ -1,0 +1,134 @@
+{
+  "acceptance_threshold_speedup": 2.0,
+  "config": {
+    "batch": 2,
+    "dtype": "float16",
+    "head_dim": 64,
+    "heads": 16,
+    "layers": 1,
+    "n": 100000,
+    "reps": 9
+  },
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 832247779328,
+      "path": "/home/izo/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU"
+    },
+    "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python": "3.12.14",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "dd6c9eed469b292a37a31468922101dd59382b83",
+    "dirty": false,
+    "status": ""
+  },
+  "results": {
+    "accepted": true,
+    "beats_pytorch_poly": true,
+    "exact_flash_ms": 1398.7015020011313,
+    "noise": {
+      "aa_discrepancy": 0.024556889111391738,
+      "minimum_detectable_effect": 1.0245568891113916,
+      "worst_paired_aa_discrepancy": 0.047662331951791786,
+      "worst_within_variant_spread": 0.03935311527959846
+    },
+    "peak_mib": {
+      "exact_flash": 403.5830078125,
+      "poly_overhead": 61.4365234375,
+      "poly_triton": 465.01953125
+    },
+    "poly_pytorch_ms": 789.9601660010376,
+    "poly_triton_control_ms": 222.5184540002374,
+    "poly_triton_ms": 227.98281500035955,
+    "samples_ms": {
+      "exact_flash_ms": [
+        1399.026588000197,
+        1399.0527559999464,
+        1398.885077000159,
+        1398.8574420000077,
+        1398.7015020011313,
+        1403.3559359995706,
+        1404.1079560010985,
+        1404.4408600002498,
+        1404.2775889993209
+      ],
+      "poly_pytorch_ms": [
+        794.5440160001453,
+        793.5605260008742,
+        795.6366880007408,
+        801.063143000647,
+        789.9601660010376,
+        801.4670720003778,
+        796.6737749993626,
+        799.6620899994014,
+        798.3435980004288
+      ],
+      "poly_triton_control_ms": [
+        230.63971800002037,
+        222.5184540002374,
+        227.00491799878364,
+        224.95246200014662,
+        225.61006899923086,
+        225.6292959991697,
+        228.71601400038344,
+        225.3658200006612,
+        227.40917000010086
+      ],
+      "poly_triton_ms": [
+        236.95464900083607,
+        227.98281500035955,
+        234.72868199860386,
+        231.70730700076092,
+        236.36317099953885,
+        232.76448999968125,
+        232.60781600038172,
+        230.27708799963875,
+        234.65793499963183
+      ]
+    },
+    "speedup_vs_exact": 6.135118131596565,
+    "speedup_vs_exact_resolvable": true,
+    "speedup_vs_pytorch_poly": 3.4649987368556343,
+    "speedup_vs_pytorch_poly_resolvable": true,
+    "variant_stats": {
+      "exact_flash_ms": {
+        "max_ms": 1404.4408600002498,
+        "median_ms": 1399.0527559999464,
+        "min_ms": 1398.7015020011313,
+        "reps": 9,
+        "spread": 0.00410334727667567
+      },
+      "poly_pytorch_ms": {
+        "max_ms": 801.4670720003778,
+        "median_ms": 796.6737749993626,
+        "min_ms": 789.9601660010376,
+        "reps": 9,
+        "spread": 0.014566438276996767
+      },
+      "poly_triton_control_ms": {
+        "max_ms": 230.63971800002037,
+        "median_ms": 225.6292959991697,
+        "min_ms": 222.5184540002374,
+        "reps": 9,
+        "spread": 0.03649703588078274
+      },
+      "poly_triton_ms": {
+        "max_ms": 236.95464900083607,
+        "median_ms": 232.76448999968125,
+        "min_ms": 227.98281500035955,
+        "reps": 9,
+        "spread": 0.03935311527959846
+      }
+    }
+  },
+  "schema_version": 2
+}
