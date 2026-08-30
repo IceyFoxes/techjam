@@ -5,6 +5,12 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx5080-902b626/`](2026-08-30-rtx5080-902b626/README.md):
+  the current FP16/polynomial Case-14 backend passes the new FP32 streamed
+  oracle on all 32 full-length samples: zero failures across 3,276,800,000
+  elements, `max_abs=0.01026`, and `mean_abs=0.0003741`. This is numerical
+  validation of the unchanged backend through explicit FP32-to-FP16 input and
+  FP16-to-FP32 output casts, not an official speedup measurement.
 - [`2026-08-30-rtx5080-4183d1d/`](2026-08-30-rtx5080-4183d1d/README.md):
   validation-only Case 14 FP32 streamed reference. It passes the immutable dense
   model at `N=4096` with zero failures and `max_abs=0.0006025`, then completes

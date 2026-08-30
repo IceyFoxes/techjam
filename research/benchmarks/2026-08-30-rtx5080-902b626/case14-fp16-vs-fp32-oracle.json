@@ -1,0 +1,334 @@
+{
+  "candidate_comparison": {
+    "candidate": "current ExtremeShapeCandidate Case-14 backend",
+    "candidate_dtype": "float16",
+    "candidate_elapsed_seconds": 10.752496661007171,
+    "failed_elements": 0,
+    "input_contract": "same FP32 sample, explicitly cast to FP16",
+    "max_abs_error": 0.01025533676147461,
+    "max_relative_error": 360727296.0,
+    "mean_abs_error": 0.0003741441356491592,
+    "oracle_dtype": "float32",
+    "passed": true,
+    "samples": [
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008390426635742188,
+        "max_relative_error": 169948.15625,
+        "mean_abs_error": 0.00037415061047190774,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008500099182128906,
+        "max_relative_error": 25396.107421875,
+        "mean_abs_error": 0.00037415952195830356,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008634090423583984,
+        "max_relative_error": 11876.373046875,
+        "mean_abs_error": 0.00037411009924773756,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.00876760482788086,
+        "max_relative_error": 17892.21484375,
+        "mean_abs_error": 0.0003741117128841875,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008965015411376953,
+        "max_relative_error": 305414208.0,
+        "mean_abs_error": 0.0003741370105116904,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008074283599853516,
+        "max_relative_error": 52809716.0,
+        "mean_abs_error": 0.0003741282340381757,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009415149688720703,
+        "max_relative_error": 7235.267578125,
+        "mean_abs_error": 0.0003741347247547533,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008167743682861328,
+        "max_relative_error": 14829.0869140625,
+        "mean_abs_error": 0.0003741434575477122,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008836746215820312,
+        "max_relative_error": 19656.025390625,
+        "mean_abs_error": 0.00037417461070683836,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009494304656982422,
+        "max_relative_error": 5143.662109375,
+        "mean_abs_error": 0.00037415337583475016,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008922576904296875,
+        "max_relative_error": 4911.654296875,
+        "mean_abs_error": 0.0003741615647652074,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009113788604736328,
+        "max_relative_error": 15488.384765625,
+        "mean_abs_error": 0.0003741801984564272,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008807182312011719,
+        "max_relative_error": 42594.51953125,
+        "mean_abs_error": 0.0003741643414961837,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008626461029052734,
+        "max_relative_error": 9641.24609375,
+        "mean_abs_error": 0.0003741994515768013,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008732318878173828,
+        "max_relative_error": 24630.62890625,
+        "mean_abs_error": 0.0003741451613825326,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008515357971191406,
+        "max_relative_error": 11568.3037109375,
+        "mean_abs_error": 0.0003741476113313985,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.00911855697631836,
+        "max_relative_error": 28589.005859375,
+        "mean_abs_error": 0.0003741280526772728,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009279251098632812,
+        "max_relative_error": 161025.0625,
+        "mean_abs_error": 0.00037412068734873487,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008498668670654297,
+        "max_relative_error": 36574.96875,
+        "mean_abs_error": 0.00037407496560665346,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009216785430908203,
+        "max_relative_error": 162356.1875,
+        "mean_abs_error": 0.0003741797582547661,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008372783660888672,
+        "max_relative_error": 34229.640625,
+        "mean_abs_error": 0.0003740908865371559,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008812427520751953,
+        "max_relative_error": 22690.015625,
+        "mean_abs_error": 0.000374179110774173,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009054183959960938,
+        "max_relative_error": 6530.2197265625,
+        "mean_abs_error": 0.0003741498334133955,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009625434875488281,
+        "max_relative_error": 10550022.0,
+        "mean_abs_error": 0.00037411608922134144,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008738517761230469,
+        "max_relative_error": 55478.34765625,
+        "mean_abs_error": 0.0003741718889424984,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.00878143310546875,
+        "max_relative_error": 360727296.0,
+        "mean_abs_error": 0.0003741392339995658,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.01025533676147461,
+        "max_relative_error": 10349.888671875,
+        "mean_abs_error": 0.0003741252156722503,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.009015560150146484,
+        "max_relative_error": 11435.7685546875,
+        "mean_abs_error": 0.00037410983227587004,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.00935220718383789,
+        "max_relative_error": 12445.1640625,
+        "mean_abs_error": 0.0003741375970273461,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.00879812240600586,
+        "max_relative_error": 5276.720703125,
+        "mean_abs_error": 0.00037414838325251787,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.00826716423034668,
+        "max_relative_error": 10487.0068359375,
+        "mean_abs_error": 0.00037416111306324076,
+        "passed": true,
+        "total_elements": 102400000
+      },
+      {
+        "failed_elements": 0,
+        "max_abs_error": 0.008539199829101562,
+        "max_relative_error": 6179.837890625,
+        "mean_abs_error": 0.0003741780057417029,
+        "passed": true,
+        "total_elements": 102400000
+      }
+    ],
+    "sigma_by_layer": [
+      0.3333839774131775,
+      0.3342217803001404
+    ],
+    "total_elements": 3276800000
+  },
+  "command": "/home/kevin/techjam/.venv/bin/python /home/kevin/techjam/src/case14_fp32_reference.py --device cuda --batch-size 32 --seq-len 100000 --validate-dense-n 4096 --seed 1234 --compare-current-candidate --output research/benchmarks/2026-08-30-rtx5080-902b626/case14-fp16-vs-fp32-oracle.json",
+  "config": {
+    "batch_size": 32,
+    "causal": true,
+    "d_model": 1024,
+    "ffn_dim": 1024,
+    "num_heads": 16,
+    "num_layers": 2,
+    "seq_len": 100000
+  },
+  "dense_validation": {
+    "failed_elements": 0,
+    "max_abs_error": 0.0006024837493896484,
+    "max_relative_error": 107.18661499023438,
+    "mean_abs_error": 4.2655925655693484e-05,
+    "passed": true,
+    "status": "pass",
+    "total_elements": 4194304
+  },
+  "dtype": "float32",
+  "elapsed_seconds": 102.36037081899121,
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 660699860992,
+      "path": "/home/kevin/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "902b626f8faf32dcfea5a7a65d0854e77ed68ffa",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-29-rtx5080-1234/\n?? research/benchmarks/2026-08-29-rtx5080-12345/\n?? research/benchmarks/2026-08-30-rtx5080-fecf994/base-dispatcher-case3.json\n?? research/benchmarks/2026-08-30-rtx5080-fecf994/baseline-case3.json\n?? research/benchmarks/2026-08-30-rtx5080-fecf994/candidate-case14-seed1234.json"
+  },
+  "output_fingerprint": {
+    "abs_max": 6.228921890258789,
+    "finite": true,
+    "square_sum": 3276769517.0582695,
+    "sum": -0.1512304403075717
+  },
+  "peak_allocated_bytes": 3795787776,
+  "purpose": "validation oracle only; not a benchmark score or candidate",
+  "schema_version": 1,
+  "streaming": {
+    "batch_chunk_size": 1,
+    "input_rng_note": "deterministic streamed samples; not asserted bitwise-identical to one monolithic batch randn"
+  },
+  "timestamp_utc": "2026-08-30T15:44:28.630607+00:00"
+}
