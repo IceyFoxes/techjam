@@ -36,33 +36,55 @@ samples at a time (`choose_batch_chunk_size` selected 2 on a 24 GB L4). Best of
 
 Interleaved A/B/C timing, best of 4 reps after warmup, strided inputs.
 
-**B=1** (`attention-core-v2.json`):
+**B=1** (`attention-core-v3-b1.json`):
 
 | path | time | vs exact | peak MiB |
 | --- | ---: | ---: | ---: |
-| exact flash SDPA | 713.5 ms | 1.00x | 201 |
-| polynomial, dense PyTorch | 580.3 ms | 1.23x | — |
-| **polynomial, fused Triton** | **300.1 ms** | **2.38x** | **265** |
+| exact flash SDPA | 711.9 ms | 1.00x | 201 |
+| polynomial, dense PyTorch | 428.1 ms | 1.66x | — |
+| **polynomial, fused Triton** | **269.9 ms** | **2.64x** | **233** |
 
-**B=2 — the shape case 14's route actually streams** (`attention-core-b2.json`):
+**B=2 — the shape case 14's route actually streams** (`attention-core-v3-b2.json`):
 
 | path | time | vs exact | peak MiB |
 | --- | ---: | ---: | ---: |
-| exact flash SDPA | 1426.4 ms | 1.00x | 404 |
-| polynomial, dense PyTorch | 1299.7 ms | 1.10x | — |
-| **polynomial, fused Triton** | **591.6 ms** | **2.41x** | **535** |
+| exact flash SDPA | 1414.0 ms | 1.00x | 404 |
+| polynomial, dense PyTorch | 845.1 ms | 1.67x | — |
+| **polynomial, fused Triton** | **328.1 ms** | **4.31x** | **471** |
 
-Also 1.93x (B=1) and 2.20x (B=2) over the dense-PyTorch polynomial path, which
-isolates the kernel's contribution from the algorithm's.
+### Where the 2.41x became 4.31x
+
+A kernel-level profile at B=2 showed the two Triton kernels were only **34%** of
+GPU time. The exact diagonal block was 195 ms of 547 -- more than both kernels
+combined -- because it was computed in float32:
+
+| change | effect at N=100000, B=2 |
+| --- | ---: |
+| baseline (v2) | 590.4 ms, 2.41x |
+| Gram-matrix denominator | 564.4 ms, 1.046x |
+| **float16 diagonal block** | **344.5 ms, 1.714x** |
+| both | **322.7 ms, 1.830x** |
+
+- **float16 diagonal block.** Upcasting to float32 forced the PV product onto an
+  `ampere_sgemm_128x128_nn` -- off the tensor cores entirely -- and tripled the
+  traffic of the `[M, C, C]` block through `exp`, the mask and the row sum. Only
+  the row sum still accumulates in float32.
+- **Gram-matrix denominator.** `phi2(a) . sum_j phi2(b_j) = a^T G a` with
+  `G = sum_j b_j b_j^T` of shape `[D, D]`, so the denominator never needed the
+  `[D*D, 1]` feature state. Removes one `quad_apply` and one `quad_update` per
+  chunk, and drops peak overhead further (67 MiB at B=2, from 131).
+
+Chunk length was A/B'd at the same time and **512 is confirmed optimal**: 256
+measured 530.0 ms and 1024 measured 423.1 ms, against 322.7 ms at 512.
 
 ## Peak VRAM — the constraint that prompted the correction
 
 The polynomial route's overhead above exact flash, at `N=100000`:
 
-| | before | after | reduction |
-| --- | ---: | ---: | ---: |
-| B=1 | +2834 MiB | **+64 MiB** | 44x |
-| B=2 | +6773 MiB | **+131 MiB** | 52x |
+| | before | after v2 | after v3 | total reduction |
+| --- | ---: | ---: | ---: | ---: |
+| B=1 | +2834 MiB | +64 MiB | **+32 MiB** | 89x |
+| B=2 | +6773 MiB | +131 MiB | **+67 MiB** | 101x |
 
 The +6.8 GiB at B=2 is what pushed a 13 GiB run past 16 GiB. Two causes, both
 now fixed: the 3-D SDPA fallback (2.4 GiB, fixed-size), and full-length
