@@ -28,7 +28,7 @@ ACCEPTANCE_SPEEDUP = 2.0
 
 
 def _time_interleaved(variants, reps=3):
-    """Time several callables by alternating them, and take each one's min.
+    """Time several callables by alternating them; return every sample, in ms.
 
     Measuring variants back to back is biased on a laptop GPU: by the third
     variant the card has been at 100% for seconds and has dropped clocks. That
@@ -37,19 +37,84 @@ def _time_interleaved(variants, reps=3):
     of loading it onto whichever runs last. The repository hit the same class of
     bug before -- see the boost-clock fix in
     research/benchmarks/README.md -- so this is a known hazard here.
+
+    Every sample is returned rather than only the minimum, because the minimum
+    alone cannot say whether a difference between two variants is real. See
+    ``summarise_timings``.
     """
     for fn in variants.values():
         fn()  # warm, and absorb Triton autotuning
     torch.cuda.synchronize()
-    best = {name: float("inf") for name in variants}
+    samples = {name: [] for name in variants}
     for _ in range(reps):
         for name, fn in variants.items():
             torch.cuda.synchronize()
             start = time.perf_counter()
             fn()
             torch.cuda.synchronize()
-            best[name] = min(best[name], time.perf_counter() - start)
-    return {name: value * 1e3 for name, value in best.items()}
+            samples[name].append((time.perf_counter() - start) * 1e3)
+    return samples
+
+
+def summarise_timings(samples, control_pairs=()):
+    """Per-variant statistics plus the noise floor that makes A/Bs decidable.
+
+    ``samples`` maps a variant name to its list of millisecond timings.
+    ``control_pairs`` names A/A pairs -- two entries running the *same*
+    implementation. The gap between such a pair is a direct measurement of what
+    this machine reports as a difference when there is none.
+
+    The floor is the larger of two quantities, because either can invalidate a
+    result on its own:
+
+    * the **A/A discrepancy**, how far apart identical code measured, and
+    * the worst **within-variant spread**, ``(max - min) / min``.
+
+    A tight A/A pair does not license trusting a 1% win taken from a run whose
+    own repetitions varied by 30%.
+
+    Returned as a ratio: ``minimum_detectable_effect`` of 1.06 means only
+    speedups of 1.06x or better (or slowdowns past 1/1.06) are reportable.
+    """
+    variants = {}
+    for name, values in samples.items():
+        ordered = sorted(values)
+        low = ordered[0]
+        mid = len(ordered) // 2
+        median = (
+            ordered[mid] if len(ordered) % 2 else (ordered[mid - 1] + ordered[mid]) / 2
+        )
+        variants[name] = {
+            "min_ms": low,
+            "median_ms": median,
+            "max_ms": ordered[-1],
+            "spread": (ordered[-1] - low) / low if low else 0.0,
+            "reps": len(ordered),
+        }
+
+    discrepancy = None
+    for left, right in control_pairs:
+        a, b = variants[left]["min_ms"], variants[right]["min_ms"]
+        gap = abs(a - b) / min(a, b)
+        discrepancy = gap if discrepancy is None else max(discrepancy, gap)
+
+    worst_spread = max((v["spread"] for v in variants.values()), default=0.0)
+    floor = max(worst_spread, discrepancy or 0.0)
+    return {
+        "variants": variants,
+        "noise": {
+            "aa_discrepancy": discrepancy,
+            "worst_within_variant_spread": worst_spread,
+            "minimum_detectable_effect": 1.0 + floor,
+        },
+    }
+
+
+def is_resolvable(ratio, minimum_detectable_effect):
+    """True when a measured ratio is outside the noise floor, in either direction."""
+    if ratio <= 0:
+        return False
+    return max(ratio, 1.0 / ratio) >= minimum_detectable_effect
 
 
 def _peak_mib_table(q, k, v, scale):
@@ -86,7 +151,18 @@ def main() -> int:
     parser.add_argument("--n", type=int, default=100000)
     parser.add_argument("--heads", type=int, default=16)
     parser.add_argument("--head-dim", type=int, default=64)
-    parser.add_argument("--reps", type=int, default=3)
+    parser.add_argument(
+        "--reps",
+        type=int,
+        default=5,
+        help="interleaved repetitions after one warm-up; 5 is the Phase 2 minimum",
+    )
+    parser.add_argument(
+        "--no-aa-control",
+        dest="aa_control",
+        action="store_false",
+        help="skip the A/A control variant, leaving the noise floor unmeasured",
+    )
     parser.add_argument(
         "--batch",
         type=int,
@@ -121,19 +197,30 @@ def main() -> int:
                     q, k, v, is_causal=True, scale=scale
                 )
 
-        timings = _time_interleaved(
-            {
-                "exact_flash_ms": exact,
-                "poly_pytorch_ms": lambda: poly_attention_forward(
-                    q, k, v, scale, sigma=0.3338, use_triton=False
-                ),
-                "poly_triton_ms": lambda: poly_attention_forward(
-                    q, k, v, scale, sigma=0.3338, use_triton=True
-                ),
-            },
-            args.reps,
-        )
-        results = dict(timings)
+        def poly_triton():
+            return poly_attention_forward(q, k, v, scale, sigma=0.3338, use_triton=True)
+
+        variants = {
+            "exact_flash_ms": exact,
+            "poly_pytorch_ms": lambda: poly_attention_forward(
+                q, k, v, scale, sigma=0.3338, use_triton=False
+            ),
+            "poly_triton_ms": poly_triton,
+        }
+        control_pairs = []
+        if args.aa_control:
+            # The SAME callable, timed as if it were a second variant. Whatever
+            # gap appears between the two is this machine reporting a difference
+            # where there is none, and it is the bar a real effect must clear.
+            variants["poly_triton_control_ms"] = poly_triton
+            control_pairs.append(("poly_triton_ms", "poly_triton_control_ms"))
+
+        samples = _time_interleaved(variants, args.reps)
+        stats = summarise_timings(samples, control_pairs)
+        results = {name: v["min_ms"] for name, v in stats["variants"].items()}
+        results["samples_ms"] = samples
+        results["noise"] = stats["noise"]
+        results["variant_stats"] = stats["variants"]
 
     results["peak_mib"] = _peak_mib_table(q, k, v, scale)
     results["speedup_vs_exact"] = (
@@ -148,12 +235,42 @@ def main() -> int:
     results["beats_pytorch_poly"] = (
         results["poly_triton_ms"] < results["poly_pytorch_ms"]
     )
-    for key, value in results.items():
-        print(f"{key}: {value}")
+
+    floor = results["noise"]["minimum_detectable_effect"]
+    # A speedup inside the noise floor is not a speedup. Both headline ratios
+    # carry that verdict so a later reader cannot quote one without it.
+    results["speedup_vs_exact_resolvable"] = is_resolvable(
+        results["speedup_vs_exact"], floor
+    )
+    results["speedup_vs_pytorch_poly_resolvable"] = is_resolvable(
+        results["speedup_vs_pytorch_poly"], floor
+    )
+
+    print(f"{'variant':28s} {'min':>9s} {'median':>9s} {'max':>9s} {'spread':>8s}")
+    for name, stat in results["variant_stats"].items():
+        print(
+            f"{name:28s} {stat['min_ms']:8.1f}m {stat['median_ms']:8.1f}m "
+            f"{stat['max_ms']:8.1f}m {stat['spread']:7.1%}"
+        )
+    noise = results["noise"]
+    aa = noise["aa_discrepancy"]
+    print(f"\nA/A discrepancy:              {'unmeasured' if aa is None else f'{aa:.1%}'}")
+    print(f"worst within-variant spread:  {noise['worst_within_variant_spread']:.1%}")
+    print(f"minimum detectable effect:    {floor:.3f}x")
+    print(
+        f"\nspeedup vs exact flash:       {results['speedup_vs_exact']:.3f}x "
+        f"({'RESOLVABLE' if results['speedup_vs_exact_resolvable'] else 'WITHIN NOISE'})"
+    )
+    print(
+        f"speedup vs pytorch poly:      {results['speedup_vs_pytorch_poly']:.3f}x "
+        f"({'RESOLVABLE' if results['speedup_vs_pytorch_poly_resolvable'] else 'WITHIN NOISE'})"
+    )
+    print(f"peak MiB:                     {results['peak_mib']}")
+    print(f"accepted (>= {ACCEPTANCE_SPEEDUP}x):           {results['accepted']}")
 
     if args.output is not None:
         payload = {
-            "schema_version": 1,
+            "schema_version": 2,
             "config": {
                 "n": args.n,
                 "heads": args.heads,
