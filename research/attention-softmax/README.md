@@ -27,9 +27,23 @@ Status: current as of 29 August 2026.
 - [`fast-attention-survey.md`](fast-attention-survey.md) — idea catalogue of ~20
   fast-attention methods from the literature, each filtered against this task's
   constraints, plus the measurement showing SDPA already performs causal
-  block-skipping.
+  block-skipping. **Partially superseded for case 14 (30 August 2026)**: its
+  Tier C blanket exclusion of approximate methods is re-tested in
+  `long-sequence-attention.md` and does not hold at N=100000.
+- [`long-sequence-attention.md`](long-sequence-attention.md) — case 14
+  (`N=100000`) only. Measures the score distribution, shows the error budget at
+  that scale admits approximation, and reports a validated order-2 polynomial
+  feature-map linear attention at 1.19x, plus four negative results.
 
-## Conclusions so far
+## Scope of these conclusions
+
+Conclusions 1-8 below were measured at `N <= 1024` and govern cases 1-5 and 7-13.
+**They do not transfer to case 14** (`N=100000`), where attention is
+compute-bound rather than memory-bound and the tolerance budget is far larger.
+See [`long-sequence-attention.md`](long-sequence-attention.md), which restates
+conclusions 1 and 8 for that case.
+
+## Conclusions so far (N <= 1024)
 
 1. **Attention here is memory-bound by roughly 25x**, not compute-bound. On
    case 13 the eager path moves the `N x N` score tensor about twelve times per
@@ -74,7 +88,12 @@ Status: current as of 29 August 2026.
    inputs, so `_split_heads`'s copies are avoidable. The Q/K/V side is inside
    Person 2's module and needs no coordination.
 
-8. **The surveyed efficient-attention literature is almost entirely inapplicable.**
+8. **The surveyed efficient-attention literature is almost entirely inapplicable
+   at these shapes.** **Scoped 30 August 2026:** true for `N <= 1024`; at case
+   14's `N=100000` the kernel/feature-map branch becomes viable and is measured
+   in [`long-sequence-attention.md`](long-sequence-attention.md). Selection-based
+   sparse methods remain excluded there too, now by measurement rather than by
+   argument.
    Every approximate method (Performer, Linformer, Reformer, Longformer, BigBird,
    Nyströmformer, cosFormer, linear attention, NSA) changes the mathematical
    result and cannot satisfy a per-element tolerance; Linformer and MQA/GQA
@@ -92,8 +111,11 @@ Status: current as of 29 August 2026.
 
 ## Scope boundaries
 
-- Cases 6 (`B=10000`) and 14 (`N=100000`) are **Person 4's** extreme-shape memory
-  scope and are excluded from these documents.
+- Case 6 (`B=10000`) is **Person 4's** extreme-shape memory scope and is excluded
+  from these documents. Case 14's *memory strategy* is likewise Person 4's
+  (see PR #13), but its *attention algorithm* is analysed in
+  [`long-sequence-attention.md`](long-sequence-attention.md), since at N=100000
+  the attention core is ~95% of all FLOPs.
 - **For Person 4 (30 August 2026):** the section 3 result applies to cases 6 and
   14 as well. Under causal attention with right padding, no padding mask need
   ever be built, which removes a `B x N` term from any chunked design and one
