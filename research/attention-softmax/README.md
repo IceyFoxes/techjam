@@ -30,6 +30,11 @@ Status: current as of 29 August 2026.
   block-skipping. **Partially superseded for case 14 (30 August 2026)**: its
   Tier C blanket exclusion of approximate methods is re-tested in
   `long-sequence-attention.md` and does not hold at N=100000.
+- [`triton-kernel-prior-art.md`](triton-kernel-prior-art.md) — what already
+  exists for the proposed fused kernel. Key finding: `flash-linear-attention`
+  implements this exact algorithm but asserts head dimension <= 16, and Based
+  chose `d'=16` deliberately for register residency, so no published kernel
+  covers our `d_h=64`.
 - [`long-sequence-attention.md`](long-sequence-attention.md) — case 14
   (`N=100000`) only. Measures the score distribution, shows the error budget at
   that scale admits approximation, and reports a validated order-2 polynomial
