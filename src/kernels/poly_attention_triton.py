@@ -14,6 +14,15 @@ State is float32 in HBM and converted to float16 on load. A float16 master state
 is about 1.1x faster and silently wrong at scale: it passes at N=16384 and fails
 at N=65536 with over a million failures. See
 ``research/attention-softmax/long-sequence-attention.md`` section 5.2.
+
+**On the autotune space.** It is deliberately narrow -- 12 configs for apply, 8
+for update, ``num_stages`` fixed at 2. Widening it to 54 each (adding
+``BC=128`` and ``num_stages`` 3 and 4) was tried and abandoned: with four
+distinct shape keys per run it is roughly 400 kernel compilations, which ran for
+several minutes with the GPU at 1% before being killed. Case 14 is a single
+forward pass, not a training loop, so that compile time is not amortised -- on a
+cold Triton cache it lands directly in the measured wall clock. Widen this only
+with evidence that the compile cost is paid back.
 """
 
 from __future__ import annotations
