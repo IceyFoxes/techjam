@@ -34,6 +34,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=1234)
     parser.add_argument("--padding-ratio", type=float, default=0.0)
     parser.add_argument(
+        "--forwards",
+        type=int,
+        default=1,
+        help="number of forwards in one process; use 2 to separate cold and warm time",
+    )
+    parser.add_argument(
+        "--disable-poly",
+        action="store_true",
+        help="force the guarded Case 14 attention module onto exact Flash",
+    )
+    parser.add_argument(
+        "--poly-disable",
+        default="",
+        help="comma-separated polynomial subpaths to disable for an A/B",
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         help="optional new JSON result path; an existing file is never overwritten",
@@ -50,6 +66,8 @@ def main() -> int:
         )
     if not 0.0 <= args.padding_ratio < 1.0:
         raise ValueError("padding_ratio must be in [0, 1)")
+    if args.forwards <= 0:
+        raise ValueError("forwards must be positive")
     if not torch.cuda.is_available():
         raise RuntimeError("extreme smoke test requires CUDA")
     if torch.__version__ != "2.13.0+cu130":
@@ -75,6 +93,15 @@ def main() -> int:
     torch.backends.cuda.matmul.allow_tf32 = True
 
     model = DispatchingTransformer(config).to(device=device, dtype=dtype).eval()
+    if args.disable_poly:
+        for layer in model.layers:
+            if hasattr(layer.attention, "poly_enabled"):
+                layer.attention.poly_enabled = False
+    poly_disable = frozenset(filter(None, args.poly_disable.split(",")))
+    if poly_disable:
+        for layer in model.layers:
+            if hasattr(layer.attention, "poly_disable"):
+                layer.attention.poly_disable = poly_disable
     x = torch.empty(
         config.batch_size,
         config.seq_len,
@@ -96,23 +123,31 @@ def main() -> int:
     valid_mask = positions[None, :] < lengths[:, None]
     x.masked_fill_(~valid_mask[..., None], 0)
 
-    torch.cuda.reset_peak_memory_stats(device)
-    started = time.perf_counter()
+    elapsed_by_forward = []
+    peak_allocated_by_forward = []
+    peak_reserved_by_forward = []
+    output_shape = [config.batch_size, config.seq_len, config.d_model]
     with torch.inference_mode():
-        output = model(x, valid_mask)
-    torch.cuda.synchronize(device)
-    elapsed = time.perf_counter() - started
-
-    for batch_slice in output.split(1):
-        if not bool(torch.isfinite(batch_slice).all()):
-            raise RuntimeError("candidate smoke output contains non-finite values")
+        for _ in range(args.forwards):
+            torch.cuda.reset_peak_memory_stats(device)
+            started = time.perf_counter()
+            output = model(x, valid_mask)
+            torch.cuda.synchronize(device)
+            elapsed_by_forward.append(time.perf_counter() - started)
+            peak_allocated_by_forward.append(torch.cuda.max_memory_allocated(device))
+            peak_reserved_by_forward.append(torch.cuda.max_memory_reserved(device))
+            for batch_slice in output.split(1):
+                if not bool(torch.isfinite(batch_slice).all()):
+                    raise RuntimeError("candidate smoke output contains non-finite values")
+            del batch_slice
+            del output
     print(f"case={args.case} dtype={args.dtype} route={model.last_route.backend}")
-    print(f"shape={tuple(output.shape)} elapsed_s={elapsed:.6f}")
+    print(f"shape={tuple(output_shape)} elapsed_s={elapsed_by_forward}")
     print(
         "peak_allocated_mib="
-        f"{torch.cuda.max_memory_allocated(device) / 2**20:.3f} "
+        f"{max(peak_allocated_by_forward) / 2**20:.3f} "
         "peak_reserved_mib="
-        f"{torch.cuda.max_memory_reserved(device) / 2**20:.3f}"
+        f"{max(peak_reserved_by_forward) / 2**20:.3f}"
     )
     if args.output is not None:
         result = {
@@ -126,8 +161,10 @@ def main() -> int:
             "dtype": args.dtype,
             "padding_ratio": args.padding_ratio,
             "route": model.last_route.backend,
+            "poly_disabled": args.disable_poly,
+            "poly_disabled_optimizations": sorted(poly_disable),
             "batch_chunk_size": model.last_extreme_chunk_size,
-            "output_shape": list(output.shape),
+            "output_shape": output_shape,
             "output_finite": True,
             "numerical_correctness": (
                 "not checked: immutable Case 14 baseline is not runnable at "
@@ -135,9 +172,12 @@ def main() -> int:
                 if args.case == 14
                 else "not checked by candidate-only smoke runner"
             ),
-            "elapsed_seconds": elapsed,
-            "peak_allocated_bytes": torch.cuda.max_memory_allocated(device),
-            "peak_reserved_bytes": torch.cuda.max_memory_reserved(device),
+            "elapsed_seconds": elapsed_by_forward[0],
+            "elapsed_seconds_by_forward": elapsed_by_forward,
+            "peak_allocated_bytes": max(peak_allocated_by_forward),
+            "peak_allocated_bytes_by_forward": peak_allocated_by_forward,
+            "peak_reserved_bytes": max(peak_reserved_by_forward),
+            "peak_reserved_bytes_by_forward": peak_reserved_by_forward,
         }
         args.output.parent.mkdir(parents=True, exist_ok=True)
         with args.output.open("x", encoding="utf-8") as output_file:

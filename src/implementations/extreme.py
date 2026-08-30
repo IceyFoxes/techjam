@@ -238,12 +238,12 @@ class FlashOnlySDPASelfAttention(StridedSDPASelfAttention):
         return self.out_proj(context)
 
 
-# Opt-in polynomial attention route for case 14. Setting this False returns
+# Guarded polynomial attention route for case 14. Setting this False returns
 # case 14 to exactly the forced-Flash behaviour, which
 # src/tests/test_poly_attention.py pins bitwise so it cannot rot.
 # See docs/kernel-integration-notes.md and
 # research/attention-softmax/triton-kernel-spec.md.
-POLY_ATTENTION_ENABLED = False
+POLY_ATTENTION_ENABLED = True
 
 
 class PolyOrFlashSelfAttention(FlashOnlySDPASelfAttention):
@@ -264,6 +264,7 @@ class PolyOrFlashSelfAttention(FlashOnlySDPASelfAttention):
     def __init__(self, d_model: int, num_heads: int) -> None:
         super().__init__(d_model, num_heads)
         self.poly_enabled = POLY_ATTENTION_ENABLED
+        self.poly_disable: Optional[frozenset] = None
         self._sigma: Optional[float] = None
 
     def route_name(self, sigma: Optional[float]) -> str:
@@ -303,7 +304,17 @@ class PolyOrFlashSelfAttention(FlashOnlySDPASelfAttention):
         if self.route_name(self._sigma) == "flash":
             return super().forward(x, valid_token_mask, causal)
 
-        context = poly_attention_forward(q, k, v, self.scale, sigma=self._sigma)
+        disable = self.poly_disable
+        if disable is None:
+            from src.kernels.poly_configs import case14_disabled_optimizations
+
+            disable = case14_disabled_optimizations(
+                (batch * self.num_heads, seq_len, self.head_dim, self.head_dim),
+                torch.cuda.get_device_capability(x.device),
+            )
+        context = poly_attention_forward(
+            q, k, v, self.scale, sigma=self._sigma, disable=disable
+        )
         context = context.transpose(1, 2).reshape(batch, seq_len, self.d_model)
         return self.out_proj(context)
 
@@ -315,7 +326,7 @@ class ExtremeShapeCandidate(BaselineTransformer):
         super().__init__(config)
         if _config_key(config) == CASE_14_CONFIG:
             for layer in self.layers:
-                layer.attention = FlashOnlySDPASelfAttention(
+                layer.attention = PolyOrFlashSelfAttention(
                     config.d_model,
                     config.num_heads,
                 )

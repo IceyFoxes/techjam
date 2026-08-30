@@ -57,6 +57,7 @@ class _PolyAttention(BaselineSelfAttention):
     def __init__(self, d_model: int, num_heads: int) -> None:
         super().__init__(d_model, num_heads)
         self.measured_sigma = None
+        self.disable = frozenset()
 
     def forward(self, x, valid_token_mask=None, causal=False):
         batch, seq_len, _ = x.shape
@@ -66,7 +67,7 @@ class _PolyAttention(BaselineSelfAttention):
         if self.measured_sigma is None:
             self.measured_sigma = estimate_sigma(q, k, self.scale)
         context = poly_attention_forward(
-            q, k, v, self.scale, sigma=self.measured_sigma
+            q, k, v, self.scale, sigma=self.measured_sigma, disable=self.disable
         )
         return self.out_proj(
             context.transpose(1, 2).reshape(batch, seq_len, self.d_model)
@@ -87,6 +88,7 @@ def main() -> int:
     parser.add_argument("--n", type=int, required=True)
     parser.add_argument("--oracle", choices=("dense", "flash"), default="flash")
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--disable", default="")
     parser.add_argument(
         "--scale-qk",
         type=float,
@@ -115,6 +117,9 @@ def main() -> int:
         None if args.oracle == "dense" else _FlashAttention, config, device
     )
     candidate = _build(_PolyAttention, config, device)
+    disabled = frozenset(filter(None, args.disable.split(",")))
+    for layer in candidate.layers:
+        layer.attention.disable = disabled
     copy_model_weights(oracle, candidate)
 
     if args.scale_qk_weights != 1.0:

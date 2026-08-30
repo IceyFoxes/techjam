@@ -4,7 +4,7 @@
 This document says what changed, what contract each change must not break, and
 how to turn it off.
 
-Status: 30 August 2026, **updated after Stage 0 of Phase 2**. Specs:
+Status: 30 August 2026, **updated after RTX 5080 end-to-end integration**. Specs:
 [`research/attention-softmax/triton-kernel-spec.md`](../research/attention-softmax/triton-kernel-spec.md)
 (Phase 1) and
 [`research/attention-softmax/integrated-kernel-spec.md`](../research/attention-softmax/integrated-kernel-spec.md)
@@ -12,9 +12,18 @@ Status: 30 August 2026, **updated after Stage 0 of Phase 2**. Specs:
 
 ## The one-line summary
 
-Case 14 gains an **opt-in, off-by-default** attention route that replaces exact
-Flash SDPA with a degree-2 polynomial approximation, guarded by a runtime check
-that falls back to Flash when the approximation is not valid.
+Case 14 uses a degree-2 polynomial approximation by default on the validated
+route, guarded by a runtime check that falls back to exact Flash when the
+approximation is not valid. `POLY_ATTENTION_ENABLED = False` remains the
+one-line exact rollback.
+
+On the RTX 5080 (`sm_120`), the official batch-one stream uses a measured
+one-kernel policy: dense PyTorch apply and diagonal blocks plus a static Triton
+`quad_update`. Compiling all three Triton kernels made the first complete
+forward slower than Flash even though it won after warm-up. The hybrid measured
+11.41-11.69 s cold against the fastest 14.68 s exact control, a conservative
+1.255x end-to-end speedup. See
+`research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/`.
 
 ## How to turn it off
 
@@ -23,8 +32,9 @@ that falls back to Flash when the approximation is not valid.
 POLY_ATTENTION_ENABLED = False
 ```
 
-That restores **exactly** today's forced-Flash behaviour. It is the default, and
-`src/tests/test_poly_attention.py::PolyRouteToggleTests` pins it so it cannot rot.
+That restores **exactly** the previous forced-Flash behaviour.
+`src/tests/test_poly_attention.py::PolyRouteToggleTests` pins the rollback so it
+cannot rot.
 
 ## Person 4 — `src/implementations/extreme.py`
 
@@ -48,8 +58,9 @@ allocates per-`N`.
 
 ## Person 1 — dispatch and compilation
 
-**Nothing in `src/dispatcher.py` changed in this phase.** The route is selected
-inside the attention module, not by `select_route`.
+`src/dispatcher.py` now constructs `PolyOrFlashSelfAttention` for Case 14. The
+top-level route remains the eager, memory-safe extreme path; the attention
+module selects polynomial versus exact Flash through the measured sigma guard.
 
 **The constraint that matters to you:** the guard calls `estimate_sigma`, which
 performs **one device-to-host synchronization** per module instance (cached

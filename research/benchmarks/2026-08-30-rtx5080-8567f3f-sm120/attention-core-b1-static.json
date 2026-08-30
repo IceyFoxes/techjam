@@ -1,0 +1,126 @@
+{
+  "acceptance_threshold_speedup": 2.0,
+  "config": {
+    "batch": 1,
+    "dtype": "float16",
+    "head_dim": 64,
+    "heads": 16,
+    "layers": 1,
+    "n": 100000,
+    "reps": 7
+  },
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665369911296,
+      "path": "/tmp/techjam-pr16-sm120",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "8567f3f4252b50e9808fa1a19265bb641121f549",
+    "dirty": true,
+    "status": "M src/dispatcher.py\n M src/extreme_smoke.py\n M src/implementations/extreme.py\n M src/kernels/poly_attention_triton.py\n M src/kernels/poly_configs.py\n M src/sweep_poly_configs.py\n M src/tests/test_dispatcher.py\n M src/tests/test_poly_attention.py\n M src/tests/test_poly_configs.py\n?? research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/"
+  },
+  "results": {
+    "accepted": true,
+    "beats_pytorch_poly": true,
+    "exact_flash_ms": 313.83167298918124,
+    "noise": {
+      "aa_discrepancy": 0.04339523719105524,
+      "minimum_detectable_effect": 1.0433952371910553,
+      "worst_paired_aa_discrepancy": 0.49649722400403656,
+      "worst_within_variant_spread": 0.6179616700226344
+    },
+    "peak_mib": {
+      "exact_flash": 201.4169921875,
+      "poly_overhead": 28.7177734375,
+      "poly_triton": 230.134765625
+    },
+    "poly_pytorch_ms": 209.77279500220902,
+    "poly_triton_control_ms": 115.18764100037515,
+    "poly_triton_ms": 120.18623600306455,
+    "samples_ms": {
+      "exact_flash_ms": [
+        313.83167298918124,
+        320.8927339874208,
+        320.84624699200504,
+        340.01106399227865,
+        323.5493910033256,
+        333.8743829954183,
+        342.2528999944916
+      ],
+      "poly_pytorch_ms": [
+        221.815422992222,
+        209.77279500220902,
+        218.14202298992313,
+        227.22440499637742,
+        220.94667599594686,
+        215.88541100209113,
+        237.48930799774826
+      ],
+      "poly_triton_control_ms": [
+        115.18764100037515,
+        123.53980999614578,
+        120.34644899540581,
+        154.69437099818606,
+        148.9321650005877,
+        186.36918799893465,
+        142.12682399374899
+      ],
+      "poly_triton_ms": [
+        128.89646999246906,
+        123.39231399528217,
+        124.77251699601766,
+        120.18623600306455,
+        122.08852000185288,
+        124.53694200667087,
+        127.28571001207456
+      ]
+    },
+    "speedup_vs_exact": 2.6112114284133088,
+    "speedup_vs_exact_resolvable": true,
+    "speedup_vs_pytorch_poly": 1.745397825728232,
+    "speedup_vs_pytorch_poly_resolvable": true,
+    "variant_stats": {
+      "exact_flash_ms": {
+        "max_ms": 342.2528999944916,
+        "median_ms": 323.5493910033256,
+        "min_ms": 313.83167298918124,
+        "reps": 7,
+        "spread": 0.0905620096741801
+      },
+      "poly_pytorch_ms": {
+        "max_ms": 237.48930799774826,
+        "median_ms": 220.94667599594686,
+        "min_ms": 209.77279500220902,
+        "reps": 7,
+        "spread": 0.13212634648476396
+      },
+      "poly_triton_control_ms": {
+        "max_ms": 186.36918799893465,
+        "median_ms": 142.12682399374899,
+        "min_ms": 115.18764100037515,
+        "reps": 7,
+        "spread": 0.6179616700226344
+      },
+      "poly_triton_ms": {
+        "max_ms": 128.89646999246906,
+        "median_ms": 124.53694200667087,
+        "min_ms": 120.18623600306455,
+        "reps": 7,
+        "spread": 0.07247280786114658
+      }
+    }
+  },
+  "schema_version": 2
+}

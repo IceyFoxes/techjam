@@ -24,9 +24,6 @@ import triton
 
 from src.infra.environment import collect_environment, collect_git
 
-M, C, D, V = 32, 512, 64, 64   # case 14 at B=2: M = B*H = 32
-
-
 def _candidates():
     """(kernel, config) pairs to time. OutOfResources entries drop out later."""
     for bc, bi, w, st in itertools.product(
@@ -38,10 +35,11 @@ def _candidates():
         yield "causal_diag", {"BC": bc, "BK": bk, "num_warps": w, "num_stages": st}
 
 
-def _runner(kernel, cfg, tensors):
+def _runner(kernel, cfg, tensors, shape):
     """A zero-argument callable launching this kernel with this configuration."""
     from src.kernels import poly_attention_triton as K
 
+    M, C, D, V = shape
     a, b, v, state, shadow, y, num, den = tensors
     if kernel == "quad_apply":
         return lambda: K._quad_apply_kernel_static[(triton.cdiv(C, cfg["BC"]), M)](
@@ -65,8 +63,16 @@ def _runner(kernel, cfg, tensors):
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--rounds", type=int, default=7)
+    parser.add_argument("--m", type=int, default=32)
+    parser.add_argument("--c", type=int, default=512)
+    parser.add_argument("--d", type=int, default=64)
+    parser.add_argument("--v", type=int, default=64)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    M, C, D, V = args.m, args.c, args.d, args.v
+    if min(M, C, D, V, args.rounds) <= 0:
+        raise ValueError("shape dimensions and rounds must be positive")
+    shape = (M, C, D, V)
 
     gen = torch.Generator(device="cuda").manual_seed(0)
     kw = dict(generator=gen, device="cuda", dtype=torch.float16)
@@ -83,7 +89,7 @@ def main() -> int:
 
     live = []
     for kernel, cfg in _candidates():
-        fn = _runner(kernel, cfg, tensors)
+        fn = _runner(kernel, cfg, tensors, shape)
         try:
             fn()                       # compile, and reject over-budget configs
             torch.cuda.synchronize()

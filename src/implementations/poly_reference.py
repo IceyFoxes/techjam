@@ -75,6 +75,7 @@ def poly_linear_attention(
     skip_prefix_chunks: bool = True,
     quad_shadow: bool = True,
     small_state_shadows: bool = True,
+    skip_final_state_update: bool = False,
 ) -> torch.Tensor:
     """Causal attention with a degree-2 polynomial feature map.
 
@@ -227,23 +228,25 @@ def poly_linear_attention(
         if t1 > prefix_end:
             emit_chunk()
 
-        bf = b.to(cdt)
-        vfc = vc.to(cdt)
-        s_const += vfc.sum(1, keepdim=True).to(state_dtype)
-        s_lin += (bf.transpose(-2, -1) @ vfc).to(state_dtype)
-        z_lin += bf.sum(1).unsqueeze(-1).to(state_dtype)
-        gram += (bf.transpose(-2, -1) @ bf).to(state_dtype)
-        if quad_update is None:
-            bq = phi2(bf)
-            s_quad += (bq.transpose(-2, -1) @ vfc).to(state_dtype)
-            del bq
-        else:
-            quad_update(bf, vfc, s_quad, shadow=s_quad_shadow)
+        # No later chunk can consume the state after the final iteration.
+        if not (skip_final_state_update and t1 == N):
+            bf = b.to(cdt)
+            vfc = vc.to(cdt)
+            s_const += vfc.sum(1, keepdim=True).to(state_dtype)
+            s_lin += (bf.transpose(-2, -1) @ vfc).to(state_dtype)
+            z_lin += bf.sum(1).unsqueeze(-1).to(state_dtype)
+            gram += (bf.transpose(-2, -1) @ bf).to(state_dtype)
+            if quad_update is None:
+                bq = phi2(bf)
+                s_quad += (bq.transpose(-2, -1) @ vfc).to(state_dtype)
+                del bq
+            else:
+                quad_update(bf, vfc, s_quad, shadow=s_quad_shadow)
 
-        if _use_small_shadows:
-            s_lin_h.copy_(s_lin)
-            gram_h.copy_(gram)
-            z_lin_h.copy_(z_lin)
+            if _use_small_shadows:
+                s_lin_h.copy_(s_lin)
+                gram_h.copy_(gram)
+                z_lin_h.copy_(z_lin)
 
     # Early tokens attend to very few keys, where a relative weight error is not
     # damped by averaging, so the max error lives there. Recomputing the first
