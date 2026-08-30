@@ -29,6 +29,7 @@ from torch_transformer_benchmark import (
     generate_random_case,
 )
 
+from src.implementations.extreme import ExtremeShapeCandidate
 from src.implementations.fp32_reference import (
     LinearMemoryFP32Reference,
     case14_config,
@@ -52,6 +53,14 @@ def parse_args() -> argparse.Namespace:
         help="first compare the oracle with the immutable dense reference",
     )
     parser.add_argument("--device", default="cuda")
+    parser.add_argument(
+        "--compare-current-candidate",
+        action="store_true",
+        help=(
+            "also run the current FP16 Case-14 backend on each FP32 sample, "
+            "cast its output back to FP32, and apply the official criterion"
+        ),
+    )
     parser.add_argument("--output", type=Path)
     return parser.parse_args()
 
@@ -102,6 +111,8 @@ def main() -> int:
     device = torch.device(args.device)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise RuntimeError("CUDA was requested but is unavailable")
+    if args.compare_current_candidate and device.type != "cuda":
+        raise RuntimeError("the current Case-14 candidate comparison requires CUDA")
 
     torch.manual_seed(args.seed)
     if device.type == "cuda":
@@ -111,9 +122,16 @@ def main() -> int:
     torch.set_float32_matmul_precision("high")
 
     config = case14_config(batch_size=args.batch_size, seq_len=args.seq_len)
-    oracle = LinearMemoryFP32Reference(config).to(
-        device=device, dtype=torch.float32
-    ).eval()
+    oracle = LinearMemoryFP32Reference(config)
+    candidate = None
+    if args.compare_current_candidate:
+        # The backend is selected from the official static model tuple.  The
+        # runner still feeds one sample at a time; batch is independent across
+        # Transformer inference, and ExtremeShapeCandidate accepts that slice.
+        candidate = ExtremeShapeCandidate(case14_config())
+        copy_model_weights(oracle, candidate)
+        candidate = candidate.to(device=device, dtype=torch.float16).eval()
+    oracle = oracle.to(device=device, dtype=torch.float32).eval()
     dense_validation = _dense_validation(
         oracle,
         seq_len=min(args.validate_dense_n, args.seq_len),
@@ -138,6 +156,13 @@ def main() -> int:
     output_square_sum = 0.0
     output_abs_max = 0.0
     finite = True
+    candidate_elapsed = 0.0
+    comparison_failed = 0
+    comparison_total = 0
+    comparison_abs_sum = 0.0
+    comparison_max_abs = 0.0
+    comparison_max_relative = 0.0
+    comparison_samples = []
     started = time.perf_counter()
     with torch.inference_mode():
         for sample_index in range(args.batch_size):
@@ -154,10 +179,37 @@ def main() -> int:
             )
             output = oracle(x, mask)
             finite &= bool(torch.isfinite(output).all())
+            if candidate is not None:
+                candidate_started = time.perf_counter()
+                candidate_output = candidate(x.half(), mask).float()
+                if device.type == "cuda":
+                    torch.cuda.synchronize(device)
+                candidate_elapsed += time.perf_counter() - candidate_started
+                accuracy = compare_outputs_streamed(output, candidate_output)
+                comparison_failed += accuracy.failed_elements
+                comparison_total += accuracy.total_elements
+                comparison_abs_sum += (
+                    accuracy.mean_abs_error * accuracy.total_elements
+                )
+                comparison_max_abs = max(
+                    comparison_max_abs, accuracy.max_abs_error
+                )
+                comparison_max_relative = max(
+                    comparison_max_relative, accuracy.max_relative_error
+                )
+                comparison_samples.append(asdict(accuracy))
+                del candidate_output
             output_sum += float(output.sum(dtype=torch.float64).item())
             output_square_sum += float(output.square().sum(dtype=torch.float64).item())
             output_abs_max = max(output_abs_max, float(output.abs().max().item()))
-            print(f"sample {sample_index + 1}/{args.batch_size}: complete")
+            suffix = (
+                ""
+                if candidate is None
+                else f" candidate_failed={accuracy.failed_elements}"
+            )
+            print(
+                f"sample {sample_index + 1}/{args.batch_size}: complete{suffix}"
+            )
             del x, mask, output
     if device.type == "cuda":
         torch.cuda.synchronize(device)
@@ -192,6 +244,24 @@ def main() -> int:
         "elapsed_seconds": elapsed,
         "peak_allocated_bytes": peak_allocated,
     }
+    if candidate is not None:
+        result["candidate_comparison"] = {
+            "candidate": "current ExtremeShapeCandidate Case-14 backend",
+            "candidate_dtype": "float16",
+            "oracle_dtype": "float32",
+            "input_contract": "same FP32 sample, explicitly cast to FP16",
+            "passed": comparison_failed == 0,
+            "failed_elements": comparison_failed,
+            "total_elements": comparison_total,
+            "max_abs_error": comparison_max_abs,
+            "max_relative_error": comparison_max_relative,
+            "mean_abs_error": comparison_abs_sum / comparison_total,
+            "candidate_elapsed_seconds": candidate_elapsed,
+            "samples": comparison_samples,
+            "sigma_by_layer": [
+                layer.attention._sigma for layer in candidate.layers
+            ],
+        }
     print(json.dumps(result, indent=2, sort_keys=True))
     if args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -199,7 +269,10 @@ def main() -> int:
             json.dump(result, output_file, indent=2, sort_keys=True)
             output_file.write("\n")
         print(f"result saved to {args.output}")
-    return 0 if finite else 2
+    comparison_passed = (
+        candidate is None or result["candidate_comparison"]["passed"]
+    )
+    return 0 if finite and comparison_passed else 2
 
 
 if __name__ == "__main__":

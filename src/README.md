@@ -158,6 +158,19 @@ math SDPA. Streamed random samples are deterministic and must also be passed to
 any candidate being checked, but are not claimed bitwise-identical to a single
 monolithic `[32, 100000, 1024]` random draw.
 
+To compare the current FP16/polynomial Case-14 backend with that FP32 oracle on
+the exact same streamed samples, add:
+
+```bash
+.venv/bin/python -m src.case14_fp32_reference \
+  --device cuda --batch-size 32 --seq-len 100000 \
+  --validate-dense-n 4096 --compare-current-candidate
+```
+
+This bypasses the dispatcher's intentional FP32 rejection only for validation:
+it casts each shared FP32 sample to FP16, runs the unchanged Case-14 backend,
+casts its output to FP32, and applies the official elementwise OR criterion.
+
 Compiled callables for ordinary cases are exercised through initial compilation
 and one replay before caching; cached-call failures demote that runtime key to
 reference. Caches remain per model instance and are invalidated if parameters are
