@@ -32,14 +32,28 @@ Status: current as of 30 August 2026.
   `long-sequence-attention.md` and does not hold at N=100000.
 - [`triton-kernel-spec.md`](triton-kernel-spec.md) — implementation spec for the
   fused kernel: phasing, the two Triton kernels, precision rules, the runtime
-  `sigma` guard, and the acceptance thresholds.
+  `sigma` guard, and the acceptance thresholds. **Section 8 superseded
+  30 August 2026** by [`integrated-kernel-spec.md`](integrated-kernel-spec.md):
+  its Phase 2 sketch proposed a two-level sequence-parallel scan to fix an
+  occupancy problem ("16 programs against 24 SMs") that the shipped kernels do
+  not have — they launch 256 and 2048 programs at B=2. Sections 1-7 and 8.2
+  remain current and are inherited by the Phase 2 spec unchanged.
+- [`integrated-kernel-spec.md`](integrated-kernel-spec.md) — Phase 2 spec: fold
+  the remaining per-chunk PyTorch work into the kernels. Staged as six
+  individually A/B'd redundancy fixes (led by a causal-tiled diagonal block),
+  then two complete per-chunk kernels, with a persistent-slab scan specified but
+  gated on measurement. Opens with a blocking noise-floor task, because four
+  identical profiles on this hardware spread 2.17x.
 - [`triton-kernel-prior-art.md`](triton-kernel-prior-art.md) — what already
   exists for the proposed fused kernel. Key finding: `flash-linear-attention`
   implements this exact algorithm but asserts head dimension <= 16, and Based
   chose `d'=16` deliberately for register residency, so no published kernel
   covers our `d_h=64`.
 - [`long-sequence-attention.md`](long-sequence-attention.md) — case 14
-  (`N=100000`) only. Measures the score distribution, shows the error budget at
+  (`N=100000`) only. Section 5.5 measures what happens if the method is applied
+  outside that scope: it is 2-186x *slower* on cases 1-13 and OOMs on case 8,
+  because it trades `O(N^2 d)` for `O(N d^3)` and those shapes sit below the
+  crossover. Measures the score distribution, shows the error budget at
   that scale admits approximation, and reports a validated order-2 polynomial
   feature-map linear attention at 1.19x, plus four negative results. **Integration
   status disputed 30 August 2026:** the later fused kernel is 1.561x faster than

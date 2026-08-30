@@ -1,0 +1,44 @@
+{
+  "acceptance_threshold_ms": 360.0,
+  "config": {
+    "batch": 1,
+    "dtype": "float16",
+    "head_dim": 64,
+    "heads": 16,
+    "layers": 1,
+    "n": 100000,
+    "reps": 3
+  },
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 832531308544,
+      "path": "/home/izo/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 4060 Laptop GPU"
+    },
+    "os": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.35",
+    "python": "3.12.14",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "098b96f088dbd421b051899b318a9e405583cdfe",
+    "dirty": false,
+    "status": ""
+  },
+  "results": {
+    "accepted": true,
+    "beats_pytorch_poly": true,
+    "exact_flash_ms": 725.7372500025667,
+    "poly_pytorch_ms": 662.8026340040378,
+    "poly_triton_ms": 342.39119900303194,
+    "speedup_vs_exact": 2.119614207712565,
+    "speedup_vs_pytorch_poly": 1.9358051139572912
+  },
+  "schema_version": 1
+}

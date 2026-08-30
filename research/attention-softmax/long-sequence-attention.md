@@ -86,9 +86,21 @@ gives
 exp(s) ~= exp(sigma^2/2) * [ (1 - sigma^2/2) + s + s^2/2 ]
 ```
 
-The `exp(sigma^2/2)` factor cancels in the softmax normalisation, so this differs
-from a plain Taylor expansion at 0 only in the constant term. With
-`a = q*sqrt(scale)` and `b = k*sqrt(scale)` so that `a.b = s`, the feature map
+**Correction, 30 August 2026.** This document originally stated that the
+`exp(sigma^2/2)` factor "cancels in the softmax normalisation, so this differs
+from a plain Taylor expansion at 0 only in the constant term", and section 4.1
+below reports a 2.3x accuracy gain on that basis. **Both are wrong.** The factor
+cancels only if every term carries it, and the diagonal chunk uses unscaled
+`exp`, so dropping it puts the inter-chunk polynomial ~5.6% low. Re-measured,
+dropping the factor is *worse than plain Taylor* at N=2048 and N=4096, and the
+2.3x figure came from one configuration that did not generalise. The correct,
+uniformly-best form keeps the factor. See
+[`triton-kernel-spec.md`](triton-kernel-spec.md) section 3 for the corrected
+coefficients and the measurement table. The correctness results in section 4.3
+are unaffected -- they were produced with the dropped-factor variant, so the
+corrected coefficients can only improve them.
+
+With `a = q*sqrt(scale)` and `b = k*sqrt(scale)` so that `a.b = s`, the feature map
 
 ```text
 phi(a) = [ sqrt(c0), sqrt(c1)*a, sqrt(c2)*vec(a a^T) ]
@@ -207,6 +219,70 @@ at chunk 512. The two gathers cost more than the bandwidth they save.
 
 See section 2.1. Effective softmax support is 89%; the top-64 keys hold 3.4% of
 the mass. There is nothing to prune.
+
+### 5.5 The method is catastrophically wrong outside case 14 — measured
+
+The scope restriction to case 14 has so far rested on argument. It was tested
+directly on 30 August 2026 by running the polynomial route against the official
+shapes for cases 1-13, attention core only, against exact Flash SDPA.
+
+**The crossover.** The polynomial trades `O(N^2 * d)` for `O(N * d^3)`. Per token
+per head, exact causal attention costs about `N * d_h` MACs and the polynomial
+about `2 * d_h^3` (the apply and the update against the `d^2 x d` state), so the
+work ratio is
+
+```text
+poly / exact  =  2 * d_h^2 / N
+```
+
+and the polynomial only wins when `N >> 2 * d_h^2`:
+
+| cases | `d_h` | `N` | crossover `N` | polynomial does |
+| --- | ---: | ---: | ---: | --- |
+| 1-6, 12, 13 | 32 | 32-1024 | 2048 | 2-64x **more** work |
+| 7, 11 | 8 | 128 | 128 | about break-even |
+| 9 | 128 | 128 | 32768 | 256x **more** work |
+| 8 | 256 | 128 | 131072 | 1024x **more** work |
+| **14** | **64** | **100000** | **8192** | **12x less work** |
+
+The 12x for case 14 is the same figure quoted in section 1 as the FLOP
+advantage. It is the same formula, evaluated on the other side of the crossover.
+
+**Measured**, RTX 4060 Laptop, float16, attention core, best of 2:
+
+| case | `B` | `N` | `d_h` | flash | polynomial | ratio | max diff |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 64 | 128 | 32 | 0.14 ms | 4.12 ms | 0.03x | 0.000e+00 |
+| 2 | 1 | 128 | 32 | 0.06 ms | 1.60 ms | 0.04x | 0.000e+00 |
+| 3 | 4 | 128 | 32 | 0.10 ms | 1.40 ms | 0.07x | 0.000e+00 |
+| 4 | 16 | 128 | 32 | 0.06 ms | 2.64 ms | 0.02x | 0.000e+00 |
+| 5 | 128 | 128 | 32 | 0.13 ms | 1.81 ms | 0.07x | 0.000e+00 |
+| 6 | 10000 | 128 | 32 | 10.25 ms | **1906.62 ms** | **0.01x** | 0.000e+00 |
+| 7 | 64 | 128 | 8 | 0.10 ms | 2.25 ms | 0.05x | 0.000e+00 |
+| 8 | 64 | 128 | 256 | 0.46 ms | **OOM** | — | — |
+| 9 | 64 | 128 | 128 | — | did not finish | — | — |
+
+Three effects compound:
+
+1. **The work is discarded.** `exact_prefix = 4096` exceeds `N` for every case
+   1-13, so `w0 = min(4096, N) = N` and SDPA overwrites the whole output. That is
+   why the max difference is exactly `0.000e+00`: the route *is* Flash, after
+   doing 2-1024x the work for nothing. Forcing `exact_prefix = N/4` so the
+   polynomial actually contributes gives a max difference of 2.441e-04 and does
+   not make it faster.
+2. **The state is `O(d_h^3)`.** Case 8's `[256, 65536, 256]` float32 state is
+   **17.2 GiB** and fails to allocate. Case 9's is 537 MiB and had not finished
+   after several minutes at 100% GPU.
+3. **Fixed overhead dominates at `N=128`.** Flash takes 0.06-0.14 ms; the
+   polynomial path issues two kernel launches plus roughly twenty small PyTorch
+   operations per chunk regardless of how little work there is.
+
+**The operational conclusion.** `sigma` measured **0.333 on every case 1-13** —
+it is invariant to `d_model`, because `nn.Linear` initialisation gives Q and K a
+component rms of 0.577 whatever the width. So the runtime `sigma` guard would
+happily admit all of them. **What keeps cases 1-13 safe is the shape check in the
+dispatcher, not the guard.** Any future change that widens the route's shape
+eligibility must not assume the guard will catch the mistake.
 
 ## 6. Remaining opportunity: a fused kernel
 

@@ -1,0 +1,143 @@
+{
+  "acceptance_threshold_speedup": 2.0,
+  "config": {
+    "batch": 1,
+    "dtype": "float16",
+    "head_dim": 64,
+    "heads": 16,
+    "layers": 1,
+    "n": 100000,
+    "reps": 7
+  },
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665339072512,
+      "path": "/tmp/techjam-pr16-sm120",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "8567f3f4252b50e9808fa1a19265bb641121f549",
+    "dirty": true,
+    "status": "M src/dispatcher.py\n M src/extreme_smoke.py\n M src/implementations/extreme.py\n M src/implementations/poly_attention.py\n M src/implementations/poly_reference.py\n M src/kernels/poly_attention_triton.py\n M src/kernels/poly_configs.py\n M src/sweep_poly_configs.py\n M src/tests/test_dispatcher.py\n M src/tests/test_poly_attention.py\n M src/tests/test_poly_configs.py\n M src/tests/test_poly_reference.py\n?? research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/"
+  },
+  "results": {
+    "accepted": true,
+    "beats_pytorch_poly": true,
+    "exact_flash_ms": 200.02986300096381,
+    "noise": {
+      "aa_discrepancy": 0.010667705878354382,
+      "minimum_detectable_effect": 1.0106677058783544,
+      "worst_paired_aa_discrepancy": 0.7068721886010402,
+      "worst_within_variant_spread": 1.187812650870373
+    },
+    "peak_mib": {
+      "exact_flash": 201.4169921875,
+      "poly_overhead": 28.7177734375,
+      "poly_triton": 230.134765625
+    },
+    "poly_pytorch_ms": 159.17193400673568,
+    "poly_triton_ab_ms": 90.23523599898908,
+    "poly_triton_control_ms": 82.66754099167883,
+    "poly_triton_ms": 83.54941400466487,
+    "samples_ms": {
+      "exact_flash_ms": [
+        204.84457600105088,
+        203.0342899961397,
+        203.02818500204012,
+        204.2396790056955,
+        200.32165700104088,
+        200.02986300096381,
+        260.94906601065304
+      ],
+      "poly_pytorch_ms": [
+        167.63591799826827,
+        175.24563601182308,
+        182.57838499266654,
+        189.26882999949157,
+        177.50957200769335,
+        159.17193400673568,
+        163.1317000137642
+      ],
+      "poly_triton_ab_ms": [
+        90.23523599898908,
+        91.01772999565583,
+        143.6035869992338,
+        151.91917199990712,
+        96.92948799056467,
+        91.68401399801951,
+        102.78140999434981
+      ],
+      "poly_triton_control_ms": [
+        82.66754099167883,
+        137.2107969946228,
+        133.3926630031783,
+        126.79083499824628,
+        180.8610919979401,
+        120.03811000613496,
+        112.85147099988535
+      ],
+      "poly_triton_ms": [
+        83.54941400466487,
+        154.01524999469984,
+        164.38684599415865,
+        84.47676200012211,
+        105.96053600602318,
+        124.01338299969211,
+        88.07100700505544
+      ]
+    },
+    "speedup_vs_exact": 2.3941504005018563,
+    "speedup_vs_exact_resolvable": true,
+    "speedup_vs_pytorch_poly": 1.905123284262036,
+    "speedup_vs_pytorch_poly_resolvable": true,
+    "variant_stats": {
+      "exact_flash_ms": {
+        "max_ms": 260.94906601065304,
+        "median_ms": 203.0342899961397,
+        "min_ms": 200.02986300096381,
+        "reps": 7,
+        "spread": 0.30455054108293667
+      },
+      "poly_pytorch_ms": {
+        "max_ms": 189.26882999949157,
+        "median_ms": 175.24563601182308,
+        "min_ms": 159.17193400673568,
+        "reps": 7,
+        "spread": 0.18908418862010107
+      },
+      "poly_triton_ab_ms": {
+        "max_ms": 151.91917199990712,
+        "median_ms": 96.92948799056467,
+        "min_ms": 90.23523599898908,
+        "reps": 7,
+        "spread": 0.6835903438165674
+      },
+      "poly_triton_control_ms": {
+        "max_ms": 180.8610919979401,
+        "median_ms": 126.79083499824628,
+        "min_ms": 82.66754099167883,
+        "reps": 7,
+        "spread": 1.187812650870373
+      },
+      "poly_triton_ms": {
+        "max_ms": 164.38684599415865,
+        "median_ms": 105.96053600602318,
+        "min_ms": 83.54941400466487,
+        "reps": 7,
+        "spread": 0.9675403825690546
+      }
+    }
+  },
+  "schema_version": 2
+}

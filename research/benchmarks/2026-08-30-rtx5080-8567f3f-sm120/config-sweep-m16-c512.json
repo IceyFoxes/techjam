@@ -1,0 +1,1274 @@
+{
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665372360704,
+      "path": "/tmp/techjam-pr16-sm120",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "8567f3f4252b50e9808fa1a19265bb641121f549",
+    "dirty": true,
+    "status": "M src/sweep_poly_configs.py\n?? research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/"
+  },
+  "results": [
+    {
+      "best_ms": 0.05615600093733519,
+      "config": {
+        "BC": 64,
+        "BK": 64,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.056244010920636356,
+      "config": {
+        "BC": 128,
+        "BK": 64,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.056563992984592915,
+      "config": {
+        "BC": 128,
+        "BK": 128,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.05659600719809532,
+      "config": {
+        "BC": 128,
+        "BK": 64,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.056706994655542076,
+      "config": {
+        "BC": 128,
+        "BK": 64,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.0570800038985908,
+      "config": {
+        "BC": 128,
+        "BK": 32,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.05719000182580203,
+      "config": {
+        "BC": 64,
+        "BK": 64,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.057950004702433944,
+      "config": {
+        "BC": 128,
+        "BK": 32,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.05805899854749441,
+      "config": {
+        "BC": 128,
+        "BK": 128,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.05811400478705764,
+      "config": {
+        "BC": 128,
+        "BK": 32,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.05824699474032968,
+      "config": {
+        "BC": 128,
+        "BK": 64,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.059092999435961246,
+      "config": {
+        "BC": 64,
+        "BK": 32,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.059775004046969116,
+      "config": {
+        "BC": 128,
+        "BK": 32,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.06562800263054669,
+      "config": {
+        "BC": 64,
+        "BK": 32,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.06605699309147894,
+      "config": {
+        "BC": 64,
+        "BK": 64,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.06662799569312483,
+      "config": {
+        "BC": 64,
+        "BK": 128,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.06701299571432173,
+      "config": {
+        "BC": 64,
+        "BK": 32,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.06947800284251571,
+      "config": {
+        "BC": 64,
+        "BK": 128,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07034601003397256,
+      "config": {
+        "BC": 256,
+        "BK": 64,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07052200089674443,
+      "config": {
+        "BC": 64,
+        "BK": 128,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07118200301192701,
+      "config": {
+        "BC": 64,
+        "BK": 32,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07133599137887359,
+      "config": {
+        "BC": 256,
+        "BK": 32,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07149099837988615,
+      "config": {
+        "BC": 128,
+        "BK": 128,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07190799806267023,
+      "config": {
+        "BC": 256,
+        "BK": 64,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07233700307551771,
+      "config": {
+        "BC": 64,
+        "BK": 128,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07462600478902459,
+      "config": {
+        "BC": 256,
+        "BK": 32,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07464700320269912,
+      "config": {
+        "BC": 128,
+        "BK": 128,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.07696899410802871,
+      "config": {
+        "BC": 64,
+        "BK": 64,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.08134599192999303,
+      "config": {
+        "BC": 256,
+        "BK": 32,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.08619799336884171,
+      "config": {
+        "BC": 256,
+        "BK": 128,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.08701201295480132,
+      "config": {
+        "BC": 256,
+        "BK": 32,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.09813300857786089,
+      "config": {
+        "BC": 256,
+        "BK": 64,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.10281999129801989,
+      "config": {
+        "BC": 256,
+        "BK": 64,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.11821999214589596,
+      "config": {
+        "BC": 256,
+        "BK": 128,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.6390479975380003,
+      "config": {
+        "BC": 256,
+        "BK": 128,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.6902110035298392,
+      "config": {
+        "BC": 256,
+        "BK": 128,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "causal_diag"
+    },
+    {
+      "best_ms": 0.10000300244428217,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.10874800500459969,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.11125700257252902,
+      "config": {
+        "BC": 128,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.11400699440855533,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.11747199459932745,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.1228280016221106,
+      "config": {
+        "BC": 128,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.12399500701576471,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.12473200331442058,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.12820698611903936,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.12874699314124882,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13027500244788826,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13217900414019823,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13229998876340687,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13558899809140712,
+      "config": {
+        "BC": 64,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13579799269791692,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13646899606101215,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13667799066752195,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.1373490085825324,
+      "config": {
+        "BC": 64,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13861400657333434,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.1388340024277568,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13941699580755085,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.13965900870971382,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.14059399836696684,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.1443009969079867,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.14942800044082105,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.16115300240926445,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.16147199494298548,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.1618469977984205,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.16189100279007107,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.16301299910992384,
+      "config": {
+        "BC": 256,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.1702399895293638,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.17298999591730535,
+      "config": {
+        "BC": 32,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.1735499972710386,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.17384800594300032,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.17404599930159748,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.17754400323610753,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.18518899742048234,
+      "config": {
+        "BC": 32,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.18737799837253988,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.20773999858647585,
+      "config": {
+        "BC": 256,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.21837699750903994,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_apply"
+    },
+    {
+      "best_ms": 0.10358900181017816,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.10591000318527222,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.10741699952632189,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.10771499364636838,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.10889199620578438,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.10928801202680916,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11005799751728773,
+      "config": {
+        "BC": 32,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.1104969996958971,
+      "config": {
+        "BC": 32,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11254400305915624,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.1134449994424358,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11420399823691696,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11485299910418689,
+      "config": {
+        "BC": 64,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11560200073290616,
+      "config": {
+        "BC": 32,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11829599679913372,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11886800348293036,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.11887899017892778,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12069400690961629,
+      "config": {
+        "BC": 32,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12215800234116614,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12262001109775156,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12273000902496278,
+      "config": {
+        "BC": 128,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12301500828471035,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12313600745983422,
+      "config": {
+        "BC": 128,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12377499660942703,
+      "config": {
+        "BC": 64,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.1239179982803762,
+      "config": {
+        "BC": 64,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12651400174945593,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12676700134761631,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.12818000686820596,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.13156300701666623,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.13395000132732093,
+      "config": {
+        "BC": 64,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.13490699348039925,
+      "config": {
+        "BC": 64,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.13597399811260402,
+      "config": {
+        "BC": 128,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.13745900650974363,
+      "config": {
+        "BC": 256,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.13951600703876466,
+      "config": {
+        "BC": 32,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.13952699373476207,
+      "config": {
+        "BC": 128,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.14000000373926014,
+      "config": {
+        "BC": 256,
+        "BI": 4,
+        "num_stages": 2,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.14045099669601768,
+      "config": {
+        "BC": 128,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.14093499339651316,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.14385099348146468,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.14575400564353913,
+      "config": {
+        "BC": 64,
+        "BI": 2,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.16101100482046604,
+      "config": {
+        "BC": 256,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.16912799037527293,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.17303299682680517,
+      "config": {
+        "BC": 32,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.17505799769423902,
+      "config": {
+        "BC": 128,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.17953499627765268,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 2,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.18242798978462815,
+      "config": {
+        "BC": 256,
+        "BI": 2,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.18425399321131408,
+      "config": {
+        "BC": 256,
+        "BI": 4,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.18489199283067137,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 8
+      },
+      "kernel": "quad_update"
+    },
+    {
+      "best_ms": 0.2116010000463575,
+      "config": {
+        "BC": 256,
+        "BI": 1,
+        "num_stages": 3,
+        "num_warps": 4
+      },
+      "kernel": "quad_update"
+    }
+  ],
+  "rounds": 9,
+  "schema_version": 1,
+  "shape": {
+    "C": 512,
+    "D": 64,
+    "M": 16,
+    "V": 64
+  }
+}

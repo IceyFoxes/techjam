@@ -238,6 +238,87 @@ class FlashOnlySDPASelfAttention(StridedSDPASelfAttention):
         return self.out_proj(context)
 
 
+# Guarded polynomial attention route for case 14. Setting this False returns
+# case 14 to exactly the forced-Flash behaviour, which
+# src/tests/test_poly_attention.py pins bitwise so it cannot rot.
+# See docs/kernel-integration-notes.md and
+# research/attention-softmax/triton-kernel-spec.md.
+POLY_ATTENTION_ENABLED = True
+
+
+class PolyOrFlashSelfAttention(FlashOnlySDPASelfAttention):
+    """Case-14 attention that may use the polynomial kernel, guarded.
+
+    Memory behaviour is unchanged from the Flash-only parent: the polynomial
+    state is ``[H, d^2, d]``, independent of both ``N`` and the batch, and the
+    per-chunk working tensors are ``[H, chunk, d]``. Nothing here scales with
+    ``B*N*d_model``, so the caller's prefix streaming and OOM backoff still
+    drive execution.
+
+    The approximation is only valid while scores stay small, which is a property
+    of the benchmark's random initialisation rather than of attention. When the
+    measured spread leaves the validated range this falls back to the parent's
+    exact Flash path.
+    """
+
+    def __init__(self, d_model: int, num_heads: int) -> None:
+        super().__init__(d_model, num_heads)
+        self.poly_enabled = POLY_ATTENTION_ENABLED
+        self.poly_disable: Optional[frozenset] = None
+        self._sigma: Optional[float] = None
+
+    def route_name(self, sigma: Optional[float]) -> str:
+        """Which path a given score spread selects. Pure, for testing."""
+        from src.implementations.poly_guard import poly_is_safe
+
+        return "poly" if self.poly_enabled and poly_is_safe(sigma) else "flash"
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        valid_token_mask: Optional[torch.Tensor] = None,
+        causal: bool = False,
+    ) -> torch.Tensor:
+        if not self.poly_enabled:
+            return super().forward(x, valid_token_mask, causal)
+        if x.device.type != "cuda":
+            raise RuntimeError("extreme Flash attention requires CUDA")
+        if x.dtype != torch.float16:
+            raise RuntimeError("extreme Flash attention requires float16")
+        if valid_token_mask is not None:
+            raise ValueError("trim padding before calling extreme Flash attention")
+
+        from src.implementations.poly_attention import poly_attention_forward
+        from src.implementations.poly_guard import estimate_sigma
+
+        batch, seq_len, _ = x.shape
+        q = self._split_heads_view(self.q_proj(x))
+        k = self._split_heads_view(self.k_proj(x))
+        v = self._split_heads_view(self.v_proj(x))
+
+        if self._sigma is None:
+            # One device-to-host synchronization per module instance, in the
+            # eager dispatch layer. It must never move inside a compiled or
+            # graph-replayed region.
+            self._sigma = estimate_sigma(q, k, self.scale)
+        if self.route_name(self._sigma) == "flash":
+            return super().forward(x, valid_token_mask, causal)
+
+        disable = self.poly_disable
+        if disable is None:
+            from src.kernels.poly_configs import case14_disabled_optimizations
+
+            disable = case14_disabled_optimizations(
+                (batch * self.num_heads, seq_len, self.head_dim, self.head_dim),
+                torch.cuda.get_device_capability(x.device),
+            )
+        context = poly_attention_forward(
+            q, k, v, self.scale, sigma=self._sigma, disable=disable
+        )
+        context = context.transpose(1, 2).reshape(batch, seq_len, self.d_model)
+        return self.out_proj(context)
+
+
 class ExtremeShapeCandidate(BaselineTransformer):
     """Standalone candidate for the two disclosed extreme configurations."""
 
@@ -245,7 +326,7 @@ class ExtremeShapeCandidate(BaselineTransformer):
         super().__init__(config)
         if _config_key(config) == CASE_14_CONFIG:
             for layer in self.layers:
-                layer.attention = FlashOnlySDPASelfAttention(
+                layer.attention = PolyOrFlashSelfAttention(
                     config.d_model,
                     config.num_heads,
                 )
