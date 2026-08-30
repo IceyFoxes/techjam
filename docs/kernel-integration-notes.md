@@ -33,7 +33,8 @@ input, it calls `super().forward(...)` — your code path, unmodified.
 
 | your invariant | why it still holds |
 | --- | --- |
-| no resident tensor scales with `B*N*d_model` | the polynomial state is `[H, d^2, d]` — 512 KiB per head, independent of `N` and `B`. Per-chunk working tensors are `[H, 512, d]`. |
+| peak VRAM stays close to the Flash path's | measured: **+131 MiB** at B=2, N=100000. An earlier version of this document claimed no tensor scaled with `B*N*d_model`; that was **wrong** and the route peaked **+6773 MiB**, enough to push a 13 GiB run past 16 GiB. Two causes, both fixed and now pinned by a test: a 3-D SDPA call that fell back to the quadratic math backend, and full-length contiguous copies from `reshape` on strided views. |
+| the polynomial state itself is shape-independent | `[H, d^2, d]` — 512 KiB per head, independent of `N` and `B`. Per-chunk working tensors are `[H, 512, d]`. This part of the original claim was correct; the problem was everything around it. |
 | prefix streaming drives execution | unchanged. The route sits *inside* one chunk's forward; `forward_prefix_chunks` and the OOM backoff are untouched. |
 | no attention mask reaches the extreme path | unchanged. It raises on a non-`None` mask exactly as yours does. |
 | Flash backend is forced, never quadratic math | unchanged on the fallback path, which is literally your method. |
@@ -87,13 +88,21 @@ Full two-layer case-14-shaped model, `B=1`, float16, RTX 4060 Laptop.
 `7.81e-03` is one float16 ulp at the output magnitude — the approximation error
 is below the representation noise floor.
 
-Latency, attention core only, one sample x one layer at `N=100000`:
+Latency and peak VRAM, attention core only, at `N=100000`, interleaved timing
+with strided inputs. **B=2 is the shape your route actually streams.**
 
-| path | time | vs exact |
-| --- | ---: | ---: |
-| exact flash SDPA (today's route) | 725.7 ms | 1.00x |
-| polynomial, dense PyTorch | 662.8 ms | 1.09x |
-| **polynomial, fused Triton** | **342.4 ms** | **2.12x** |
+| path | B=1 | B=2 | peak MiB (B=2) |
+| --- | ---: | ---: | ---: |
+| exact flash SDPA (today's route) | 713.5 ms | 1426.4 ms | 404 |
+| polynomial, dense PyTorch | 580.3 ms | 1299.7 ms | — |
+| **polynomial, fused Triton** | **300.1 ms** | **591.6 ms** | **535** |
+
+**2.41x at B=2, with +131 MiB of VRAM overhead.**
+
+An earlier version of this document quoted 342.4 ms / 2.12x. That figure is
+superseded: it was measured with contiguous inputs the real module never
+produces, it included a bug worth ~72 ms and 2.4 GiB, and its variants were
+timed back to back on a throttling GPU.
 
 The guard ceiling is `sigma = 0.45`, measured: `sigma 0.4808` was the largest
 value passing the criterion and `0.5217` the first to fail, against an operating

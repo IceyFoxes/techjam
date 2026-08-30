@@ -86,15 +86,16 @@ def poly_linear_attention(
     M = B * H
     cdt = compute_dtype if compute_dtype is not None else state_dtype
 
-    qf = q.reshape(M, N, D)
-    kf = k.reshape(M, N, D)
-    vf = v.reshape(M, N, D)
-    out = torch.empty_like(qf)
+    # q/k/v arrive as strided views from ``_split_heads_view``, so flattening
+    # [B, H] into one axis is NOT free -- it forces a full contiguous copy of
+    # each tensor. Slicing first keeps those copies at [M, chunk, D] instead of
+    # [M, N, D]: 2 MiB per chunk rather than 410 MiB per tensor at case 14's
+    # shape. For the same reason ``sqrt(scale)`` is folded into the per-chunk
+    # slice rather than applied to a full-length copy up front.
+    out = torch.empty((B, H, N, D), device=q.device, dtype=q.dtype)
 
     c0, c1, c2 = hermite_coefficients(sigma)
     rs = math.sqrt(scale)
-    a_all = qf * rs
-    b_all = kf * rs
 
     dev = q.device
     s_const = torch.zeros(M, 1, D, device=dev, dtype=state_dtype)
@@ -104,12 +105,14 @@ def poly_linear_attention(
     z_lin = torch.zeros(M, D, 1, device=dev, dtype=state_dtype)
     z_quad = torch.zeros(M, D * D, 1, device=dev, dtype=state_dtype)
 
+    blocked_full = torch.ones(chunk, chunk, device=dev, dtype=torch.bool).triu(1)
+
     for t0 in range(0, N, chunk):
         t1 = min(t0 + chunk, N)
         C = t1 - t0
-        a = a_all[:, t0:t1]
-        b = b_all[:, t0:t1]
-        vc = vf[:, t0:t1]
+        a = (q[:, :, t0:t1] * rs).reshape(M, C, D)
+        b = (k[:, :, t0:t1] * rs).reshape(M, C, D)
+        vc = v[:, :, t0:t1].reshape(M, C, D)
 
         if t0 == 0:
             num = torch.zeros(M, C, D, device=dev, dtype=state_dtype)
@@ -136,13 +139,13 @@ def poly_linear_attention(
         # Exact diagonal block. No max subtraction: scores are measured bounded
         # to [-2.203, 2.404], so exp cannot overflow. The guard keeps that true.
         sc = (a @ b.transpose(-2, -1)).to(torch.float32)
-        blocked = torch.ones(C, C, device=dev, dtype=torch.bool).triu(1)
+        blocked = blocked_full if C == chunk else blocked_full[:C, :C]
         w = torch.exp(sc).masked_fill(blocked, 0.0)
         num = num + (w @ vc.to(torch.float32)).to(state_dtype)
         den = den + w.sum(-1, keepdim=True).to(state_dtype)
         del sc, w
 
-        out[:, t0:t1] = (num / den).to(q.dtype)
+        out[:, :, t0:t1] = (num / den).to(q.dtype).reshape(B, H, C, D)
         del num, den
 
         bf = b.to(cdt)
@@ -167,7 +170,12 @@ def poly_linear_attention(
     # at W=4096, N=100000 -- and removes that tail entirely.
     if exact_prefix > 0:
         w0 = min(exact_prefix, N)
-        out[:, :w0] = F.scaled_dot_product_attention(
-            qf[:, :w0], kf[:, :w0], vf[:, :w0], is_causal=True, scale=scale
+        # Pass 4-D slices. Every fused SDPA backend rejects 3-D input, and the
+        # fallback is the quadratic math backend, which materialises an
+        # [M, w0, w0] score matrix -- 2.4 GiB and ~72 ms per call at w0=4096.
+        # That is invisible to correctness tests, so the cost is pinned by
+        # src/tests/test_poly_attention.py::PolyMemoryTests instead.
+        out[:, :, :w0] = F.scaled_dot_product_attention(
+            q[:, :, :w0], k[:, :, :w0], v[:, :, :w0], is_causal=True, scale=scale
         )
-    return out.reshape(B, H, N, D)
+    return out

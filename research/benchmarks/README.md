@@ -6,9 +6,9 @@ unless promoted to a checkpoint or needed to document a regression.
 ## Current Runs
 
 - [`2026-08-30-rtx4060-poly/`](2026-08-30-rtx4060-poly/README.md): Person 2 fused
-  polynomial attention kernel, Phase 1 acceptance. **342.4 ms against 725.7 ms
-  exact flash at N=100000, 2.12x**, and 1.94x over the dense-PyTorch polynomial
-  path. Zero failed elements against the dense reference at N=4096/8192 and
+  polynomial attention kernel, Phase 1 acceptance. **2.41x at the real chunk
+  shape (B=2, N=100000): 591.6 ms against 1426.4 ms exact flash**, with peak-VRAM
+  overhead cut from +6773 MiB to +131 MiB. Zero failed elements against the dense reference at N=4096/8192 and
   against an exact-flash oracle to N=100000 (0 / 102,400,000). Includes the
   sigma-guard calibration sweep. Attention core only; case 14 cannot run end to
   end on an 8 GiB card, and the route is an approximation guarded at runtime.
@@ -44,6 +44,14 @@ unless promoted to a checkpoint or needed to document a regression.
   compiler-mode checkpoints and rejected numerical routes on an RTX 5080.
 
 ## Invalid, Stale, or Superseded Runs
+
+- 30 August 2026: the `attention-core.json` figure of **342.4 ms / 2.12x** inside
+  [`2026-08-30-rtx4060-poly/`](2026-08-30-rtx4060-poly/README.md) is
+  **superseded**. It used contiguous inputs where the real module supplies
+  strided views, it included a 3-D SDPA fallback costing 2.4 GiB and ~72 ms, and
+  its variants were timed back to back on a thermally throttling laptop GPU.
+  Replaced by `attention-core-v2.json` (B=1) and `attention-core-b2.json` (B=2)
+  in the same directory. The JSON is retained as history; do not quote it.
 
 - 29 August 2026: the RTX 4050 Case-3 packed-QKV rejection in
   [`packed-qkv-exploration.md`](../projections-ffn-fusion/packed-qkv-exploration.md)
