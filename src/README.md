@@ -117,7 +117,10 @@ batch through the existing strided SDPA implementation. Case 14 requires FP16
 at the official default input scale, trims each right-padded sample to its valid prefix, processes small batch
 chunks, and forces the FlashAttention SDPA backend so it cannot silently fall
 back to quadratic math attention. Both routes choose the largest conservative
-power-of-two chunk and halve it on a recoverable CUDA OOM. Unsupported extreme
+power-of-two chunk and halve it on a recoverable CUDA OOM. Both are also
+eligible to drop the causal padding key mask, which is dead code under causal
+attention with a right-padded mask; that is where Case 6 benefits, since Case 14
+already trims to valid prefixes and passes no mask at all. Unsupported extreme
 dtype contracts are rejected before input allocation; device and backend
 contracts fail before unsafe execution. BF16 and non-default
 input scales are not claimed because representative reduced-shape tests fail the

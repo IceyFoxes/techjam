@@ -364,8 +364,15 @@ class DispatchingTransformer(BaselineTransformer):
         It is therefore called only on a cache miss, alongside compilation,
         which costs far more. Calling it per forward would cost roughly 70% of
         case 2's compiled runtime and erase the gain it buys.
+
+        The extreme routes are eligible too. They are eager and chunked, so the
+        synchronization neither breaks graph replay nor adds a cost they do not
+        already pay: case 14's prefix streaming already reads the mask on the
+        host. Case 6 is where this actually pays, because it streams the mask
+        through to SDPA; case 14 trims to valid prefixes and passes None, so the
+        flag is inert there.
         """
-        if route.backend != COMPILED_SDPA_BACKEND:
+        if route.backend not in (COMPILED_SDPA_BACKEND, EXTREME_MEMORY_BACKEND):
             # The reference fallback must reproduce the baseline exactly.
             return False
         if not self.config.causal or valid_token_mask is None:
@@ -636,11 +643,16 @@ class DispatchingTransformer(BaselineTransformer):
                     f"official case {route.case_id} extreme route is inference-only"
                 )
             assert route.case_id is not None
+            # Set explicitly rather than relying on the class-level default, so
+            # this route cannot inherit a stale flag from an earlier forward.
+            drop_key_mask = self._may_drop_key_mask(route, valid_token_mask)
+            self._set_drop_key_mask(drop_key_mask)
             function = self._extreme_entrypoint(route.case_id)
             self._compiled_forwards[key] = CachedForward(
                 function,
                 compiled=False,
                 case_id=route.case_id,
+                drop_key_mask=drop_key_mask,
             )
             return function(x, valid_token_mask)
 
