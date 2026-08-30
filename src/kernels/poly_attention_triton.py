@@ -54,6 +54,24 @@ if HAS_TRITON:
         """Outer-product slab: ``phi[c, i*D + j] = ai[c, i] * a[c, j]``.
 
         Shared by both kernels, and by the Phase 2 fused scan when it lands.
+
+        **Do not try to hoist the caller's ``ai`` load.** ``ai`` is a column
+        subset of ``a``, which is already resident, so re-loading it each
+        iteration looks redundant. It is not worth removing, and the obvious
+        removal is a disaster. Measured at ``BC=128, BI=1``, M=32, C=512, D=64:
+
+            as shipped   9 ld.global, 248 regs,  0 spills, 0.4606 ms
+            hoisted    520 ld.global, 255 regs, 32 spills, 8.8300 ms
+
+        Slicing ``ai`` out of the resident tile needs a compile-time index,
+        which means ``tl.static_range``, which fully unrolls the 64-iteration
+        feature loop and blows the register budget -- the 520 loads are spill
+        traffic, not data. The output was bitwise identical (max diff 0.0), so
+        the transformation was correct and 19x slower.
+
+        Triton already compiles the "redundant" load into 9 global loads total
+        for the whole kernel. There is nothing there to win. Recorded as Stage 0
+        task F6 in research/attention-softmax/integrated-kernel-spec.md.
         """
         return tl.reshape(ai[:, :, None] * a[:, None, :], (BC, BI * D))
 
