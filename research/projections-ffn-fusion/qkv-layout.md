@@ -127,3 +127,21 @@ All public sources were accessed on 29 August 2026.
 - FlashAttention,
   [`modules/mha.py`](https://github.com/Dao-AILab/flash-attention/blob/ce088ab9ce0fc0434dcd8afa0a791da9fcc3a820/flash_attn/modules/mha.py):
   proven packed projection-to-attention-to-output composition.
+
+## Person 2 note on the key mask (30 August 2026)
+
+`PackedQKVSDPASelfAttention` inherits the always-on broadcast key mask from
+`StridedSDPASelfAttention`. Under causal attention that mask is bitwise dead
+code and dropping it measured faster on every in-scope case, so whichever route
+is chosen for the strided module applies to the packed one unchanged — the
+layout decision and the mask decision are independent.
+
+Evidence and the proposed one-line change:
+[`../attention-softmax/safe-optimization-spec.md`](../attention-softmax/safe-optimization-spec.md)
+section 3 and
+[`../framework-fastpaths/dispatcher-strategy.md`](../framework-fastpaths/dispatcher-strategy.md).
+
+Outstanding for the boundary contract: the SDPA output stride, which decides
+whether the `context.transpose(1, 2).reshape(...)` on the way out still copies.
+Not yet recorded; it needs a run with stride logging rather than an inference
+from the timings.

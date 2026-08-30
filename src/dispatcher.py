@@ -20,6 +20,7 @@ from torch_transformer_benchmark import (
     TransformerConfig,
 )
 
+from src.implementations.attention_routing import MaskKind, classify_mask
 from src.implementations.sdpa import (
     PackedQKVSDPASelfAttention,
     StridedSDPASelfAttention,
@@ -132,6 +133,7 @@ class CachedForward:
     function: ForwardCallable
     compiled: bool
     case_id: Optional[int]
+    drop_key_mask: bool = False
 
 
 class UnsupportedCaseError(RuntimeError):
@@ -335,6 +337,40 @@ class DispatchingTransformer(BaselineTransformer):
         result = super().load_state_dict(state_dict, strict=strict, assign=assign)
         self.clear_runtime_cache()
         return result
+
+    def _set_drop_key_mask(self, enabled: bool) -> None:
+        """Apply the key-mask decision to every attention module.
+
+        Called from the uncompiled dispatch layer before the routed callable
+        runs, so the value is fixed for the duration of that call and is baked
+        in when Dynamo traces the compiled entry point.
+        """
+        for layer in self.layers:
+            layer.attention.drop_key_mask = enabled
+
+    def _may_drop_key_mask(
+        self,
+        route: RouteDecision,
+        valid_token_mask: Optional[torch.Tensor],
+    ) -> bool:
+        """Decide once, on the host, whether the key mask is removable.
+
+        Requires causal attention AND a prefix-valid (right-padded) mask: causal
+        masking then already writes -inf everywhere the key mask would, making
+        removal bitwise exact. A general mask -- left padding or interior gaps --
+        is NOT removable, so it is checked rather than assumed.
+
+        This performs one device-to-host synchronization, measured at ~85-99 us.
+        It is therefore called only on a cache miss, alongside compilation,
+        which costs far more. Calling it per forward would cost roughly 70% of
+        case 2's compiled runtime and erase the gain it buys.
+        """
+        if route.backend != COMPILED_SDPA_BACKEND:
+            # The reference fallback must reproduce the baseline exactly.
+            return False
+        if not self.config.causal or valid_token_mask is None:
+            return False
+        return classify_mask(valid_token_mask) is MaskKind.PREFIX
 
     def _forward_sdpa(
         self,
@@ -542,10 +578,12 @@ class DispatchingTransformer(BaselineTransformer):
         valid_token_mask: Optional[torch.Tensor],
     ) -> torch.Tensor:
         self._compile_failures[key] = f"{type(error).__name__}: {error}"
+        self._set_drop_key_mask(False)
         self._compiled_forwards[key] = CachedForward(
             self._forward_reference,
             compiled=False,
             case_id=case_id,
+            drop_key_mask=False,
         )
         self._last_route = RouteDecision(
             case_id,
@@ -563,6 +601,7 @@ class DispatchingTransformer(BaselineTransformer):
         key = self._runtime_key(x, valid_token_mask)
         cached = self._compiled_forwards.get(key)
         if cached is not None:
+            self._set_drop_key_mask(cached.drop_key_mask)
             if not cached.compiled:
                 return cached.function(x, valid_token_mask)
             try:
@@ -583,10 +622,12 @@ class DispatchingTransformer(BaselineTransformer):
                 f"official case {route.case_id} is unsupported: {route.reason}"
             )
         if route.backend == REFERENCE_BACKEND:
+            self._set_drop_key_mask(False)
             self._compiled_forwards[key] = CachedForward(
                 self._forward_reference,
                 compiled=False,
                 case_id=route.case_id,
+                drop_key_mask=False,
             )
             return self._forward_reference(x, valid_token_mask)
         if route.backend == EXTREME_MEMORY_BACKEND:
@@ -605,6 +646,10 @@ class DispatchingTransformer(BaselineTransformer):
 
         assert route.compile_mode is not None
         assert route.case_id is not None
+        # One host sync per runtime key, never per forward. Must precede
+        # compilation so Dynamo traces the intended masking.
+        drop_key_mask = self._may_drop_key_mask(route, valid_token_mask)
+        self._set_drop_key_mask(drop_key_mask)
         try:
             compiled = torch.compile(
                 self._compile_entrypoint(route.case_id),
@@ -627,6 +672,7 @@ class DispatchingTransformer(BaselineTransformer):
             compiled,
             compiled=True,
             case_id=route.case_id,
+            drop_key_mask=drop_key_mask,
         )
         return output
 
