@@ -86,9 +86,21 @@ gives
 exp(s) ~= exp(sigma^2/2) * [ (1 - sigma^2/2) + s + s^2/2 ]
 ```
 
-The `exp(sigma^2/2)` factor cancels in the softmax normalisation, so this differs
-from a plain Taylor expansion at 0 only in the constant term. With
-`a = q*sqrt(scale)` and `b = k*sqrt(scale)` so that `a.b = s`, the feature map
+**Correction, 30 August 2026.** This document originally stated that the
+`exp(sigma^2/2)` factor "cancels in the softmax normalisation, so this differs
+from a plain Taylor expansion at 0 only in the constant term", and section 4.1
+below reports a 2.3x accuracy gain on that basis. **Both are wrong.** The factor
+cancels only if every term carries it, and the diagonal chunk uses unscaled
+`exp`, so dropping it puts the inter-chunk polynomial ~5.6% low. Re-measured,
+dropping the factor is *worse than plain Taylor* at N=2048 and N=4096, and the
+2.3x figure came from one configuration that did not generalise. The correct,
+uniformly-best form keeps the factor. See
+[`triton-kernel-spec.md`](triton-kernel-spec.md) section 3 for the corrected
+coefficients and the measurement table. The correctness results in section 4.3
+are unaffected -- they were produced with the dropped-factor variant, so the
+corrected coefficients can only improve them.
+
+With `a = q*sqrt(scale)` and `b = k*sqrt(scale)` so that `a.b = s`, the feature map
 
 ```text
 phi(a) = [ sqrt(c0), sqrt(c1)*a, sqrt(c2)*vec(a a^T) ]
