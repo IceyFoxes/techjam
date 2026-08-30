@@ -39,7 +39,10 @@ Status: current as of 29 August 2026.
   chose `d'=16` deliberately for register residency, so no published kernel
   covers our `d_h=64`.
 - [`long-sequence-attention.md`](long-sequence-attention.md) — case 14
-  (`N=100000`) only. Measures the score distribution, shows the error budget at
+  (`N=100000`) only. Section 5.5 measures what happens if the method is applied
+  outside that scope: it is 2-186x *slower* on cases 1-13 and OOMs on case 8,
+  because it trades `O(N^2 d)` for `O(N d^3)` and those shapes sit below the
+  crossover. Measures the score distribution, shows the error budget at
   that scale admits approximation, and reports a validated order-2 polynomial
   feature-map linear attention at 1.19x, plus four negative results.
 
