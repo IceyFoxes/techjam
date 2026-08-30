@@ -5,6 +5,11 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx5080-4183d1d/`](2026-08-30-rtx5080-4183d1d/README.md):
+  validation-only Case 14 FP32 streamed reference. It passes the immutable dense
+  model at `N=4096` with zero failures and `max_abs=0.0006025`, then completes
+  the full `B=32, N=100000` shape in 90.581 s at 3,595.902 MiB peak allocation.
+  This establishes oracle feasibility, not candidate correctness or speedup.
 - [`2026-08-30-rtx4060-stage0/`](2026-08-30-rtx4060-stage0/README.md): Person 2
   Phase 2 **Stage 0**, accepted. **1.439x over the Phase 1 kernel (328.1 ->
   228.0 ms at B=2), and 6.135x over exact Flash**, with peak VRAM overhead down
