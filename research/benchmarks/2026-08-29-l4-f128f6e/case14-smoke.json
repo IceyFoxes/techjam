@@ -1,0 +1,51 @@
+{
+  "batch_chunk_size": 2,
+  "command": "/home/ec2-user/techjam/.venv/bin/python /home/ec2-user/techjam/src/extreme_smoke.py --case 14 --dtype float16 --output research/benchmarks/2026-08-29-l4-f128f6e/case14-smoke.json",
+  "config": {
+    "batch_size": 32,
+    "causal": true,
+    "d_model": 1024,
+    "ffn_dim": 1024,
+    "num_heads": 16,
+    "num_layers": 2,
+    "seq_len": 100000
+  },
+  "dtype": "float16",
+  "elapsed_seconds": 25.230146416000025,
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 535047159808,
+      "path": "/home/ec2-user/techjam",
+      "total_bytes": 579740872704
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "580.95.05",
+      "name": "NVIDIA L4"
+    },
+    "os": "Linux-6.1.158-178.288.amzn2023.x86_64-x86_64-with-glibc2.34",
+    "python": "3.12.10",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "f128f6ee6a40619d5b92bc92b91d60d13d266f15",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-29-l4-f128f6e/"
+  },
+  "numerical_correctness": "not checked: immutable Case 14 baseline is not runnable at this scale",
+  "official_case_id": 14,
+  "output_finite": true,
+  "output_shape": [
+    32,
+    100000,
+    1024
+  ],
+  "padding_ratio": 0.0,
+  "peak_allocated_bytes": 16012131328,
+  "peak_reserved_bytes": 16057892864,
+  "route": "extreme-memory",
+  "schema_version": 1,
+  "timestamp_utc": "2026-08-29T19:53:53.428929+00:00"
+}

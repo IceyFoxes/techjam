@@ -7,6 +7,10 @@
 - Evidence: immutable benchmark graph, preserved compiled RTX 5080 whole-model
   records, exploratory RTX 4050 decisions, and official library/source review.
 - No code was changed and no GPU timing was run for this screen.
+- **Superseded for next-step status on 29 August 2026:** the proposed bounded
+  epilogue experiment has now been run and rejected for numerical failure; see
+  [the remaining performance screen](remaining-performance-screen.md). The direction
+  ranking and original gate below are retained as the pre-experiment record.
 
 ## Starting Decisions
 

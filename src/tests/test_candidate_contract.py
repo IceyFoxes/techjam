@@ -56,10 +56,29 @@ class CandidateContractTests(unittest.TestCase):
                 with self.assertRaises((TypeError, ValueError)):
                     candidate.validate()
 
-    def test_dispatcher_declares_self_compilation_and_extreme_cases(self) -> None:
+    def test_rejects_invalid_device_contract_metadata(self) -> None:
+        contracts = (
+            {"official_case_min_cuda_capability": ((6, (8, 0)), (6, (0, 0)))},
+            {"official_case_min_cuda_capability": ((6, "8.0"),)},
+            {"official_case_torch_versions": ((6, ("2.13",)), (6, ("2.12",)))},
+            {"official_case_torch_versions": ((6, ()),)},
+        )
+        for contract in contracts:
+            with self.subTest(contract=contract):
+                candidate = CandidateSpec(
+                    name="example",
+                    model_factory=lambda config: config,
+                    owner="test",
+                    description="test candidate",
+                    **contract,
+                )
+                with self.assertRaises((TypeError, ValueError)):
+                    candidate.validate()
+
+    def test_dispatcher_declares_self_compilation_and_all_cases(self) -> None:
         candidate = load_candidate("src.dispatcher")
         self.assertTrue(candidate.self_compiling)
-        self.assertEqual(candidate.unsupported_official_cases, (6, 14))
+        self.assertEqual(candidate.unsupported_official_cases, ())
 
     def test_benchmark_rejects_nested_compilation(self) -> None:
         from src.infra import validate_candidate_execution
@@ -70,9 +89,28 @@ class CandidateContractTests(unittest.TestCase):
                 candidate,
                 official_case_id=1,
                 compile_user=True,
+                dtype_name="float32",
+                device_type="cuda",
+                cuda_capability=(12, 0),
+                torch_version="2.13.0+cu130",
             )
 
-    def test_benchmark_rejects_extreme_case_before_allocation(self) -> None:
+    def test_candidate_only_runner_accepts_case14(self) -> None:
+        from src.infra import validate_candidate_execution
+
+        candidate = load_candidate("src.dispatcher")
+        validate_candidate_execution(
+            candidate,
+            official_case_id=14,
+            compile_user=False,
+            dtype_name="float16",
+            candidate_only=True,
+            device_type="cuda",
+            cuda_capability=(12, 0),
+            torch_version="2.13.0+cu130",
+        )
+
+    def test_benchmark_rejects_unsafe_extreme_dtype_before_allocation(self) -> None:
         from src.infra import validate_candidate_execution
 
         candidate = load_candidate("src.dispatcher")
@@ -81,7 +119,64 @@ class CandidateContractTests(unittest.TestCase):
                 candidate,
                 official_case_id=14,
                 compile_user=False,
+                dtype_name="float32",
             )
+
+    def test_regular_benchmark_rejects_case14_unsafe_baseline(self) -> None:
+        from src.infra import validate_candidate_execution
+
+        candidate = load_candidate("src.dispatcher")
+        with self.assertRaisesRegex(ValueError, "no runnable dense baseline"):
+            validate_candidate_execution(
+                candidate,
+                official_case_id=14,
+                compile_user=False,
+                dtype_name="float16",
+                device_type="cuda",
+                cuda_capability=(12, 0),
+                torch_version="2.13.0+cu130",
+            )
+
+    def test_candidate_only_runner_rejects_nondefault_case14_scale(self) -> None:
+        from src.infra import validate_candidate_execution
+
+        candidate = load_candidate("src.dispatcher")
+        with self.assertRaisesRegex(ValueError, "default input scale"):
+            validate_candidate_execution(
+                candidate,
+                official_case_id=14,
+                compile_user=False,
+                dtype_name="float16",
+                candidate_only=True,
+                input_scale=0.1,
+                device_type="cuda",
+                cuda_capability=(12, 0),
+                torch_version="2.13.0+cu130",
+            )
+
+    def test_case6_rejects_unsupported_device_before_allocation(self) -> None:
+        from src.infra import validate_candidate_execution
+
+        candidate = load_candidate("src.dispatcher")
+        for device_type, capability, version in (
+            ("cpu", None, "2.13.0+cu130"),
+            ("cuda", (7, 5), "2.13.0+cu130"),
+            ("cuda", (8, 9), "2.12.0+cu128"),
+        ):
+            with self.subTest(
+                device_type=device_type,
+                capability=capability,
+                version=version,
+            ), self.assertRaisesRegex(ValueError, "before model/input allocation"):
+                validate_candidate_execution(
+                    candidate,
+                    official_case_id=6,
+                    compile_user=False,
+                    dtype_name="float32",
+                    device_type=device_type,
+                    cuda_capability=capability,
+                    torch_version=version,
+                )
 
 
 class OfficialCasesTests(unittest.TestCase):
