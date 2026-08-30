@@ -4,8 +4,11 @@
 This document says what changed, what contract each change must not break, and
 how to turn it off.
 
-Status: 30 August 2026. Spec:
-[`research/attention-softmax/triton-kernel-spec.md`](../research/attention-softmax/triton-kernel-spec.md).
+Status: 30 August 2026, **updated after Stage 0 of Phase 2**. Specs:
+[`research/attention-softmax/triton-kernel-spec.md`](../research/attention-softmax/triton-kernel-spec.md)
+(Phase 1) and
+[`research/attention-softmax/integrated-kernel-spec.md`](../research/attention-softmax/integrated-kernel-spec.md)
+(Phase 2).
 
 ## The one-line summary
 
@@ -78,36 +81,60 @@ Full two-layer case-14-shaped model, `B=1`, float16, RTX 4060 Laptop.
 
 | oracle | N | failures | max abs err |
 | --- | ---: | ---: | ---: |
-| dense reference | 4096 | 0 / 4,194,304 | 7.81e-03 |
-| dense reference | 8192 | 0 / 8,388,608 | 7.81e-03 |
+| dense reference | 4096 | 0 / 4,194,304 | 5.86e-03 |
+| dense reference | 8192 | 0 / 8,388,608 | 5.86e-03 |
 | exact flash | 16384 | 0 / 16,777,216 | 7.81e-03 |
 | exact flash | 32768 | 0 / 33,554,432 | 7.81e-03 |
 | exact flash | 65536 | 0 / 67,108,864 | 7.81e-03 |
 | exact flash | 100000 | 0 / 102,400,000 | 7.81e-03 |
 
 `7.81e-03` is one float16 ulp at the output magnitude — the approximation error
-is below the representation noise floor.
+is below the representation noise floor. The two dense-oracle rows improved to
+`5.86e-03` in Stage 0, because the diagonal-block kernel keeps scores in float32
+where the dense block rounded them.
 
 Latency and peak VRAM, attention core only, at `N=100000`, interleaved timing
 with strided inputs. **B=2 is the shape your route actually streams.**
 
 | path | B=1 | B=2 | peak MiB (B=2) |
 | --- | ---: | ---: | ---: |
-| exact flash SDPA (today's route) | 711.9 ms | 1414.0 ms | 404 |
-| polynomial, dense PyTorch | 428.1 ms | 845.1 ms | — |
-| **polynomial, fused Triton** | **269.9 ms** | **328.1 ms** | **471** |
+| exact flash SDPA (today's route) | 699.8 ms | 1398.7 ms | 404 |
+| polynomial, dense PyTorch | 382.1 ms | 790.0 ms | — |
+| **polynomial, Stage 0 Triton** | **317.2 ms** | **228.0 ms** | **465** |
 
-**4.31x at B=2, with +67 MiB of VRAM overhead.**
+**6.135x at B=2, with +61.4 MiB of VRAM overhead** — up from 4.31x and down
+from +67 MiB after Phase 2 Stage 0. The A/A control in the same run put the
+noise floor at 2.5%, so the ratio is resolvable with wide margin.
+
+The B=1 column is noisy (6.1% floor, 23% spreads) and B=1 is *slower per sample*
+than B=2, because `M = B*H` halves and the launch grids shrink with it. B=2 is
+the shape your route streams, and it is the one to judge on.
+
+Full record, including the per-fix A/Bs and two rejected changes:
+[`research/benchmarks/2026-08-30-rtx4060-stage0/`](../research/benchmarks/2026-08-30-rtx4060-stage0/README.md).
 
 An earlier version of this document quoted 342.4 ms / 2.12x. That figure is
 superseded: it was measured with contiguous inputs the real module never
 produces, it included a bug worth ~72 ms and 2.4 GiB, and its variants were
 timed back to back on a throttling GPU.
 
-The guard ceiling is `sigma = 0.45`, measured: `sigma 0.4808` was the largest
-value passing the criterion and `0.5217` the first to fail, against an operating
-point of `0.334`. Full sweep and environment in
-`research/benchmarks/2026-08-30-rtx4060-poly/`.
+**The guard ceiling changed in Stage 0, from `sigma = 0.45` to `0.40`.** Read
+this if you review nothing else here.
+
+Stage 0's diagonal-block kernel computes `exp` in float32 where the previous
+dense block rounded scores to float16. That shifted the accuracy boundary down:
+`sigma 0.4808` passed with zero failures before Stage 0 and fails after it. The
+old ceiling of 0.45 was justified as sitting *below* the largest verified pass;
+after the change it sat *above* the first failure, so it would have admitted
+configurations that fail the criterion.
+
+The new ceiling of 0.40 is below the largest clean pass (0.4188) and about 20%
+above the operating point's seed-to-seed spread (0.3327-0.3343), so it can
+neither admit a failing configuration nor cause a spurious fallback.
+
+**The transferable lesson: any change to the numerics must re-run this sweep.**
+A measured ceiling is only as good as its last re-measurement. Full sweep in
+`research/benchmarks/2026-08-30-rtx4060-stage0/`.
 
 **This is the attention core, not whole case 14.** Case 14 cannot run end to end
 on the 8 GiB card these numbers come from -- it needs a 12.21 GiB floor for the

@@ -14,6 +14,8 @@
 
 **Task F0 of the spec is already complete** (commit `708fe73`); its result is baked into the Global Constraints below.
 
+**STATUS: EXECUTED AND ACCEPTED, 30 August 2026.** Stage 0 delivered **1.439x** (328.1 -> 228.0 ms at B=2), 6.135x over exact Flash, +61.4 MiB peak VRAM, zero correctness failures at all six oracle points, 194 tests passing. Two tasks ended in rejections (F6, and Design B at the gate) and one finding forced a fix outside the plan's scope (`SIGMA_CEILING` lowered from 0.45 to 0.40). Full record: [`research/benchmarks/2026-08-30-rtx4060-stage0/`](../../../research/benchmarks/2026-08-30-rtx4060-stage0/README.md).
+
 ## Global Constraints
 
 - **Branch:** all work on `fused-kernal`, branched from `master`. Never commit code to `master` — research only.
@@ -66,7 +68,7 @@ This task builds the kernel and proves it computes the right thing. Task 2 wires
 - Consumes: `HAS_TRITON` from `src.kernels`.
 - Produces: `causal_diag(a, b, v) -> tuple[Tensor, Tensor]`. `a` and `b` are `[M, C, D]` float16 and `v` is `[M, C, V]` float16; returns `(num, den)` where `num` is `[M, C, V]` float32 and `den` is `[M, C, 1]` float32. In this codebase `V == D == 64`, but the kernel does not assume it. Computes `w = tril(exp(a @ b.T))`, then `num = w @ v` and `den = w.sum(-1)`, with `w` rounded to float16 before both the `v` product and the row sum.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/tests/test_poly_diag.py`:
 
@@ -169,12 +171,12 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `.venv/bin/python -m unittest src.tests.test_poly_diag -v`
 Expected: FAIL, `ImportError: cannot import name 'causal_diag'`.
 
-- [ ] **Step 3: Implement the kernel**
+- [x] **Step 3: Implement the kernel**
 
 Add to `src/kernels/poly_attention_triton.py`, inside the `if HAS_TRITON:` block, after `_phi_tile`:
 
@@ -302,12 +304,12 @@ def causal_diag(a: torch.Tensor, b: torch.Tensor, v: torch.Tensor):
     return num, den.unsqueeze(-1)
 ```
 
-- [ ] **Step 4: Run the test to verify it passes**
+- [x] **Step 4: Run the test to verify it passes**
 
 Run: `.venv/bin/python -m unittest src.tests.test_poly_diag -v`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/kernels/poly_attention_triton.py src/tests/test_poly_diag.py
@@ -328,7 +330,7 @@ git push origin fused-kernal
 - Consumes: `causal_diag(a, b, v) -> (num, den)` from Task 1.
 - Produces: `poly_linear_attention(..., causal_diag=None)`. When `None`, the dense block runs exactly as today.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `src/tests/test_poly_reference.py`:
 
@@ -356,12 +358,12 @@ Add to `src/tests/test_poly_reference.py`:
         self.assertLess((base - hooked).abs().max().item(), 1e-5)
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `.venv/bin/python -m unittest src.tests.test_poly_reference -v -k causal_diag`
 Expected: FAIL, `TypeError: poly_linear_attention() got an unexpected keyword argument 'causal_diag'`.
 
-- [ ] **Step 3: Implement the hook**
+- [x] **Step 3: Implement the hook**
 
 In `src/implementations/poly_reference.py`, add the parameter to the signature after `quad_update`:
 
@@ -428,12 +430,12 @@ In `src/implementations/poly_attention.py`, extend the Triton import and the cal
 
 and add `causal_diag=diag_fn,` to the `poly_linear_attention(...)` call.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `.venv/bin/python -m unittest discover -s src/tests`
 Expected: PASS, all tests.
 
-- [ ] **Step 5: Verify end-to-end correctness against both oracles**
+- [x] **Step 5: Verify end-to-end correctness against both oracles**
 
 ```bash
 .venv/bin/python -m src.validate_poly --n 4096   --oracle dense
@@ -443,7 +445,7 @@ Expected: PASS, all tests.
 
 Expected: **zero** failing elements on all three. If any fails, stop — the fp32 `exp` in the kernel is one fewer rounding than the dense block, and the spec flagged "more accurate than the reference" as a real failure mode. Report the failure rather than loosening anything.
 
-- [ ] **Step 6: Build the A/B mechanism, then A/B the change**
+- [x] **Step 6: Build the A/B mechanism, then A/B the change**
 
 Every Global Constraint about measurement requires both arms in one session, so
 the harness needs a way to run the *old* path as a second arm. Add an opt-out
@@ -502,7 +504,7 @@ Compare `poly_triton_ms` against `poly_triton_ab_ms`, and check the ratio agains
 the A/A floor printed in the same run. Expected: the largest single gain in
 Stage 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/implementations/poly_reference.py src/implementations/poly_attention.py src/tests/test_poly_reference.py
@@ -526,7 +528,7 @@ Worth ~4% against a 2.7% floor, so it is **marginally** measurable. The test ass
 - Consumes: the `causal_diag` hook from Task 2.
 - Produces: no signature change.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `src/tests/test_poly_reference.py`:
 
@@ -571,12 +573,12 @@ Add to `src/tests/test_poly_reference.py`:
         self.assertLess((skipped - full).abs().max().item(), 1e-5)
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/bin/python -m unittest src.tests.test_poly_reference -v -k prefix`
 Expected: FAIL on `test_chunks_inside_the_exact_prefix_are_not_computed` with `4 != 2`.
 
-- [ ] **Step 3: Implement the skip**
+- [x] **Step 3: Implement the skip**
 
 In `poly_linear_attention`, before the chunk loop:
 
@@ -641,12 +643,12 @@ Note `s_quad_view` in the `quad_apply` call: that name is introduced in Task 4.
 Until Task 4 lands, it reads `s_quad`. If executing tasks out of order, use
 whichever of the two currently exists.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `.venv/bin/python -m unittest discover -s src/tests`
 Expected: PASS.
 
-- [ ] **Step 5: Verify correctness end to end**
+- [x] **Step 5: Verify correctness end to end**
 
 ```bash
 .venv/bin/python -m src.validate_poly --n 8192   --oracle dense
@@ -655,7 +657,7 @@ Expected: PASS.
 
 Expected: zero failing elements.
 
-- [ ] **Step 6: A/B the change, same session**
+- [x] **Step 6: A/B the change, same session**
 
 ```bash
 .venv/bin/python -m src.bench_poly --n 100000 --batch 2 --reps 7
@@ -663,7 +665,7 @@ Expected: zero failing elements.
 
 Expect ~4% against a floor of 0.6-2.7%. **If the verdict is `WITHIN NOISE`, keep the change anyway and record it as unmeasured** — it strictly removes work and the hook-count test proves it, which is the honest basis here. Do not report it as a speedup.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/implementations/poly_reference.py src/tests/test_poly_reference.py
@@ -690,7 +692,7 @@ The apply kernel already does `s.to(tl.float16)` before its dot. Having the upda
 - Consumes: `quad_apply(a, s)`, `quad_update(b, v, out)` as they exist.
 - Produces: `quad_update(b, v, out, shadow=None) -> None`. When `shadow` is a `[M, D*D, V]` float16 tensor, the updated state is also written to it. `quad_apply(a, s)` gains support for `s` being float16.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `src/tests/test_poly_kernel.py`:
 
@@ -739,12 +741,12 @@ class QuadShadowTests(unittest.TestCase):
         self.assertTrue(torch.equal(shadow, state.to(torch.float16)))
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/bin/python -m unittest src.tests.test_poly_kernel -v -k Shadow`
 Expected: FAIL, `TypeError: quad_update() got an unexpected keyword argument 'shadow'`.
 
-- [ ] **Step 3: Implement the shadow**
+- [x] **Step 3: Implement the shadow**
 
 In `_quad_update_kernel`, add `sh_ptr` and strides after `o_ptr`'s, add `HAS_SHADOW: tl.constexpr` to the signature, and replace the final store with:
 
@@ -802,12 +804,12 @@ In `poly_linear_attention`, allocate the shadow when the Triton hooks are in use
 
 Use `s_quad_view` in the `quad_apply(af, ...)` call and pass `shadow=s_quad_shadow` to `quad_update`.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `.venv/bin/python -m unittest discover -s src/tests`
 Expected: PASS.
 
-- [ ] **Step 5: Verify correctness end to end**
+- [x] **Step 5: Verify correctness end to end**
 
 ```bash
 .venv/bin/python -m src.validate_poly --n 8192   --oracle dense
@@ -817,7 +819,7 @@ Expected: PASS.
 
 Expected: zero failing elements. **N=65536 is the specific regression that catches an fp16 master state**; it must stay clean.
 
-- [ ] **Step 6: A/B the change, same session, and check VRAM**
+- [x] **Step 6: A/B the change, same session, and check VRAM**
 
 ```bash
 .venv/bin/python -m src.bench_poly --n 100000 --batch 2 --reps 7
@@ -825,7 +827,7 @@ Expected: zero failing elements. **N=65536 is the specific regression that catch
 
 The shadow adds `M * D*D * D * 2` bytes = **16 MiB at B=2**, so `poly_overhead` should rise from +67 MiB to roughly +83 MiB. That is inside the spec's +100 MiB ceiling but it consumes most of the headroom — record it explicitly. **If the latency verdict is `WITHIN NOISE`, revert this task**: it costs 16 MiB and buys nothing measurable, which fails the spec's own "kept only if it pays" rule.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/kernels/poly_attention_triton.py src/implementations/poly_reference.py src/tests/test_poly_kernel.py
@@ -850,7 +852,7 @@ This task replaces autotune on the shipped path with a measured table, which als
 - Consumes: nothing.
 - Produces: `lookup(kernel: str, key: tuple[int, ...], capability: tuple[int, int]) -> dict | None`. Returns a config dict such as `{"BC": 128, "BI": 2, "num_warps": 4, "num_stages": 2}`, or `None` when the combination has not been measured.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `src/tests/test_poly_configs.py`:
 
@@ -901,12 +903,12 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `.venv/bin/python -m unittest src.tests.test_poly_configs -v`
 Expected: FAIL, `ModuleNotFoundError: No module named 'src.kernels.poly_configs'`.
 
-- [ ] **Step 3: Split each kernel into a device function with two entry points**
+- [x] **Step 3: Split each kernel into a device function with two entry points**
 
 The sweep and the fast path both need to launch a kernel at an explicit
 configuration, while the fallback still needs an autotuned one. Factor each
@@ -944,7 +946,7 @@ than duplicating the body.
 Run `.venv/bin/python -m unittest discover -s src/tests` — the existing kernel
 tests must still pass, since this step changes no arithmetic.
 
-- [ ] **Step 4: Run the interleaved sweep that produces the table**
+- [x] **Step 4: Run the interleaved sweep that produces the table**
 
 Create `src/sweep_poly_configs.py` (code lives under `src/`, never under
 `research/`). It must **interleave** configurations rather than time them
@@ -1089,7 +1091,7 @@ Run it, substituting today's date and `git rev-parse --short HEAD`:
 
 The `_static` entry points it calls were created in Step 3.
 
-- [ ] **Step 5: Write the table**
+- [x] **Step 5: Write the table**
 
 Create `src/kernels/poly_configs.py`, filling the values from Step 3's sweep:
 
@@ -1127,7 +1129,7 @@ def lookup(kernel, key, capability):
     return {k: v for k, v in entry.items() if k != "source"}
 ```
 
-- [ ] **Step 6: Use the table in the kernel wrappers**
+- [x] **Step 6: Use the table in the kernel wrappers**
 
 In each wrapper, consult the table before falling back to the autotuned entry point. Keep the autotuned kernel as a separate symbol so the fallback path still exists:
 
@@ -1141,12 +1143,12 @@ In each wrapper, consult the table before falling back to the autotuned entry po
 
 `_quad_apply_kernel_static` is the same `@triton.jit` function without the `@triton.autotune` decorator. Factor the body into a shared `@triton.jit` device function so there is one implementation and two entry points.
 
-- [ ] **Step 7: Run the tests to verify they pass**
+- [x] **Step 7: Run the tests to verify they pass**
 
 Run: `.venv/bin/python -m unittest discover -s src/tests`
 Expected: PASS.
 
-- [ ] **Step 8: Verify correctness and A/B, same session**
+- [x] **Step 8: Verify correctness and A/B, same session**
 
 ```bash
 .venv/bin/python -m src.validate_poly --n 100000 --oracle flash
@@ -1155,7 +1157,7 @@ Expected: PASS.
 
 Expected: zero failing elements. The gain here is partly **cold-start** — autotune compile time that no longer runs — so also record a cold-cache figure with `TRITON_CACHE_DIR` pointed at an empty directory, which is what a graded single forward pass would actually see.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add src/kernels/ src/sweep_poly_configs.py src/tests/test_poly_configs.py research/benchmarks/
@@ -1179,7 +1181,7 @@ Worth ~4%, so like Task 3 it sits only marginally above the floor. **Stage 1A su
 - Consumes: nothing new.
 - Produces: no signature change.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add to `src/tests/test_poly_reference.py`:
 
@@ -1214,12 +1216,12 @@ Add to `src/tests/test_poly_reference.py`:
             self.assertTrue(torch.equal(shadow, master.half()), name)
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `.venv/bin/python -m unittest src.tests.test_poly_reference -v -k shadows`
 Expected: FAIL, `AttributeError: module has no attribute '_fold_chunk_into_state'`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 Extract the state into a small dataclass with an explicit fold step, so masters and shadows cannot drift apart in separate places:
 
@@ -1253,12 +1255,12 @@ def _fold_chunk_into_state(state, bf, vfc, count):
 
 Use `state.s_lin_h`, `state.gram_h`, `state.z_lin_h` at the numerator and denominator sites, and `state.z_const` as a Python float in the `c0 * z_const` term.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [x] **Step 4: Run the tests to verify they pass**
 
 Run: `.venv/bin/python -m unittest discover -s src/tests`
 Expected: PASS.
 
-- [ ] **Step 5: Verify correctness and A/B, same session**
+- [x] **Step 5: Verify correctness and A/B, same session**
 
 ```bash
 .venv/bin/python -m src.validate_poly --n 8192   --oracle dense
@@ -1268,7 +1270,7 @@ Expected: PASS.
 
 Expected: zero failing elements. Keep the change if resolvable or if it is neutral and simplifies the code; revert if it measures slower.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/implementations/poly_reference.py src/tests/test_poly_reference.py
@@ -1289,7 +1291,7 @@ Both kernels re-load `ai` (a column subset of `a`, already in registers) from gl
 
 **Interfaces:** none.
 
-- [ ] **Step 1: Attempt the hoist**
+- [x] **Step 1: Attempt the hoist**
 
 The loop currently reloads `ai` from global on every iteration:
 
@@ -1325,7 +1327,7 @@ slice here. If `tl.static_range` cannot be used because `D // BI` is not a
 compile-time constant in the autotuned entry point, **stop and record that**;
 the negative result is the deliverable.
 
-- [ ] **Step 2: Judge it by proxy, not by A/B**
+- [x] **Step 2: Judge it by proxy, not by A/B**
 
 Latency cannot decide this. Use the two measures that can:
 
@@ -1340,12 +1342,12 @@ print(k.asm['ptx'].count('ld.global'))
 
 Expected: fewer `ld.global` instructions if the hoist worked. If the count is unchanged, the hoist did nothing and is reverted.
 
-- [ ] **Step 3: Run the tests**
+- [x] **Step 3: Run the tests**
 
 Run: `.venv/bin/python -m unittest discover -s src/tests`
 Expected: PASS if kept.
 
-- [ ] **Step 4: Commit the outcome, whichever it is**
+- [x] **Step 4: Commit the outcome, whichever it is**
 
 If kept:
 
@@ -1377,7 +1379,7 @@ Stage 0 is not finished when the fixes land. It is finished when the new attribu
 
 **Interfaces:** none.
 
-- [ ] **Step 1: Re-run the full correctness table**
+- [x] **Step 1: Re-run the full correctness table**
 
 ```bash
 .venv/bin/python -m src.validate_poly --n 4096   --oracle dense
@@ -1390,7 +1392,7 @@ Stage 0 is not finished when the fixes land. It is finished when the new attribu
 
 Expected: **zero** failing elements at every `N`. This is the gate; a single failure blocks Stage 0 regardless of speed.
 
-- [ ] **Step 2: Re-run the guard sweep**
+- [x] **Step 2: Re-run the guard sweep**
 
 ```bash
 for w in 1.0 1.1 1.2 1.25 1.3 1.4 1.5; do
@@ -1400,7 +1402,7 @@ done
 
 Expected: reproduces the Phase 1 result — passes through `sigma` 0.4808, first failure at 0.5217 — confirming `SIGMA_CEILING = 0.45` still has margin.
 
-- [ ] **Step 3: Establish the floor and measure the Stage 0 baseline**
+- [x] **Step 3: Establish the floor and measure the Stage 0 baseline**
 
 ```bash
 .venv/bin/python -m src.bench_poly --n 100000 --batch 1 --reps 7 \
@@ -1411,12 +1413,12 @@ Expected: reproduces the Phase 1 result — passes through `sigma` 0.4808, first
 
 Gate: **>= 1.15x** over the shipped 328.1 ms at B=2, with the ratio marked `RESOLVABLE`. Record the peak VRAM overhead against the **+100 MiB** ceiling — Task 4's shadow alone consumes 16 MiB of the 33 MiB headroom.
 
-- [ ] **Step 4: Re-profile for attribution**
+- [x] **Step 4: Re-profile for attribution**
 
 Re-run the kernel-level profile from
 `research/benchmarks/2026-08-30-rtx4060-6dc9639/README.md` (the command is recorded there verbatim) and produce the new grouped table. Report **shares**, not milliseconds — four identical runs of the old path spread 2.17x while shares held at 51-55%.
 
-- [ ] **Step 5: Decide Stage 1, in writing**
+- [x] **Step 5: Decide Stage 1, in writing**
 
 The spec's Design B gate has two conditions. Answer both from Step 4's profile:
 
@@ -1425,19 +1427,19 @@ The spec's Design B gate has two conditions. Answer both from Step 4's profile:
 
 Record the answer either way. **"Design B rejected with evidence" is a legitimate outcome of Phase 2, not a failure of it.** If Design A is confirmed, note which of its components the new profile says to prioritise.
 
-- [ ] **Step 6: Write the run record**
+- [x] **Step 6: Write the run record**
 
 Create `research/benchmarks/<date>-rtx4060-<commit>/README.md` carrying, per the repository's benchmark policy: the exact commands, commit, timestamp, input shapes, dtype, correctness result, latency with its noise floor and verdict, peak VRAM, and the CPU/GPU/OS/driver/CUDA/PyTorch versions. Add it to `research/benchmarks/README.md`.
 
 State explicitly which fixes were kept, which were `WITHIN NOISE` and kept anyway on structural grounds, and which were reverted.
 
-- [ ] **Step 7: Update the integration notes and the spec**
+- [x] **Step 7: Update the integration notes and the spec**
 
 In `docs/kernel-integration-notes.md`, replace the latency and VRAM tables with the Stage 0 figures. Persons 1 and 4 read this document; it must never carry a stale number.
 
 In the spec, mark F1-F6 with their outcomes and record the Stage 1 decision from Step 5.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add research/ docs/
