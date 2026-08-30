@@ -181,6 +181,12 @@ def main() -> int:
         default=1,
         help="samples per chunk; case 14's route selected 2 on a 24 GB L4",
     )
+    parser.add_argument(
+        "--ab-disable",
+        default="",
+        help="comma-separated optimizations to switch off in a second arm, "
+             "so both sides of an A/B run in one session (e.g. 'diag')",
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
@@ -219,6 +225,13 @@ def main() -> int:
             ),
             "poly_triton_ms": poly_triton,
         }
+        if args.ab_disable:
+            # The pre-optimization path, as a second arm in THIS session.
+            off = frozenset(args.ab_disable.split(","))
+            variants["poly_triton_ab_ms"] = lambda: poly_attention_forward(
+                q, k, v, scale, sigma=0.3338, use_triton=True, disable=off
+            )
+
         control_pairs = []
         if args.aa_control:
             # The SAME callable, timed as if it were a second variant. Whatever

@@ -26,6 +26,7 @@ def poly_attention_forward(
     *,
     sigma: Optional[float],
     use_triton: bool = True,
+    disable: frozenset = frozenset(),
 ) -> torch.Tensor:
     """Causal polynomial attention over ``[B, H, N, D]`` tensors.
 
@@ -36,12 +37,22 @@ def poly_attention_forward(
     The fused kernels are used only for float16 CUDA inputs, which is what case
     14's route supplies. Everything else falls through to dense PyTorch, which
     computes the same function.
+
+    ``disable`` turns individual optimizations off by name, so the
+    pre-optimization path can run as a second arm in the SAME benchmarking
+    session. Identical code drifted 17.5% between sessions on this hardware, so
+    a cross-session A/B is not a measurement. Recognised names: ``"diag"``.
     """
-    apply_fn = update_fn = None
+    apply_fn = update_fn = diag_fn = None
     if use_triton and HAS_TRITON and q.is_cuda and q.dtype == torch.float16:
-        from src.kernels.poly_attention_triton import quad_apply, quad_update
+        from src.kernels.poly_attention_triton import (
+            causal_diag,
+            quad_apply,
+            quad_update,
+        )
 
         apply_fn, update_fn = quad_apply, quad_update
+        diag_fn = None if "diag" in disable else causal_diag
 
     return poly_linear_attention(
         q, k, v, scale,
@@ -52,4 +63,5 @@ def poly_attention_forward(
         compute_dtype=torch.float16,
         quad_apply=apply_fn,
         quad_update=update_fn,
+        causal_diag=diag_fn,
     )
