@@ -4,7 +4,7 @@ Research for the `QK^T` / causal softmax / `PV` region of the Transformer layer,
 owned by Person 2 per
 [`four-way-team-split.md`](../team-coordination/four-way-team-split.md).
 
-Status: current as of 29 August 2026.
+Status: current as of 30 August 2026.
 
 ## Documents
 
@@ -41,7 +41,12 @@ Status: current as of 29 August 2026.
 - [`long-sequence-attention.md`](long-sequence-attention.md) — case 14
   (`N=100000`) only. Measures the score distribution, shows the error budget at
   that scale admits approximation, and reports a validated order-2 polynomial
-  feature-map linear attention at 1.19x, plus four negative results.
+  feature-map linear attention at 1.19x, plus four negative results. **Integration
+  status disputed 30 August 2026:** the later fused kernel is 1.561x faster than
+  exact Flash in an RTX 5080 attention-core microbenchmark, but the submitted PR
+  does not select it and a locally wired full Case 14 run is 16.886x slower with
+  2.58 GiB more peak allocation at the 16 GiB VRAM cliff. See the
+  [`b9506f3` A/B record](../benchmarks/2026-08-30-rtx5080-b9506f3/README.md).
 
 ## Scope of these conclusions
 
