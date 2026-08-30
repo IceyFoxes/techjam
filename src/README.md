@@ -113,11 +113,14 @@ failures use exact reference arithmetic.
 
 Cases 6 and 14 use eager memory-safe routes because dense reference execution is
 itself unsafe at their extreme sizes. Case 6 requires float32 and streams the
-batch through the existing strided SDPA implementation. Case 14 requires FP16
-at the official default input scale, trims each right-padded sample to its valid prefix, processes small batch
-chunks, and forces the FlashAttention SDPA backend so it cannot silently fall
-back to quadratic math attention. Both routes choose the largest conservative
-power-of-two chunk and halve it on a recoverable CUDA OOM. Both are also
+batch through the existing strided SDPA implementation. The current Case 14
+candidate requires FP16 at the default input scale, trims each right-padded
+sample to its valid prefix, processes small batch chunks, and forces the
+FlashAttention SDPA backend so it cannot silently fall back to quadratic math
+attention. FP16 is our validated candidate contract, not an organizer-specified
+property of Case 14: the Appendix has no dtype column and the immutable harness
+defaults to float32. Both routes choose the largest conservative power-of-two
+chunk and halve it on a recoverable CUDA OOM. Both are also
 eligible to drop the causal padding key mask, which is dead code under causal
 attention with a right-padded mask; that is where Case 6 benefits, since Case 14
 already trims to valid prefixes and passes no mask at all. Unsupported extreme
@@ -133,6 +136,27 @@ smoke runner to prove allocation safety and backend execution:
 ```bash
 .venv/bin/python -m src.extreme_smoke --case 14 --dtype float16
 ```
+
+For investigation of the likely FP32 evaluation contract, a separate validation
+oracle preserves the immutable reference's FP32 projections, normalization,
+FFN, residual, and causal-softmax semantics while evaluating attention through
+a forced linear-memory SDPA backend. It streams one batch sample at a time and
+reduces each output immediately, because the complete FP32 input plus output is
+about 24.4 GiB. It is not a submitted candidate and its timing is not a score:
+
+```bash
+.venv/bin/python -m src.case14_fp32_reference \
+  --device cuda --batch-size 32 --seq-len 100000 \
+  --validate-dense-n 1024 \
+  --output research/benchmarks/DATE-GPU-COMMIT/case14-fp32-reference.json
+```
+
+The initial reduced-length validation compares this oracle with the immutable
+dense reference. On CUDA, the oracle enables only cuDNN or memory-efficient
+SDPA; it fails if neither supports FP32 rather than silently selecting quadratic
+math SDPA. Streamed random samples are deterministic and must also be passed to
+any candidate being checked, but are not claimed bitwise-identical to a single
+monolithic `[32, 100000, 1024]` random draw.
 
 Compiled callables for ordinary cases are exercised through initial compilation
 and one replay before caching; cached-call failures demote that runtime key to
