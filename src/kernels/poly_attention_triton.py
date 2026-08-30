@@ -30,6 +30,20 @@ from __future__ import annotations
 import torch
 
 from src.kernels import HAS_TRITON
+from src.kernels.poly_configs import lookup as _measured_config
+
+# Benchmark switch only. Setting it False forces every launch back onto the
+# narrow autotune, so the pre-F4 path can run as a second arm in the SAME
+# session -- cross-session comparisons are not measurements on this hardware.
+# Production code must leave this True; src/tests/test_poly_configs.py pins the
+# table itself.
+USE_MEASURED_CONFIGS = True
+
+
+def _lookup_config(kernel, key, capability):
+    if not USE_MEASURED_CONFIGS:
+        return None
+    return _measured_config(kernel, key, capability)
 
 if HAS_TRITON:
     import triton
@@ -406,14 +420,24 @@ def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
     s = s.contiguous()
     y = torch.empty((M, C, V), device=a.device, dtype=a.dtype)
     BV = max(16, triton.next_power_of_2(V))
-    grid = lambda meta: (triton.cdiv(C, meta["BC"]), M)  # noqa: E731
-    _quad_apply_kernel[grid](
+    args = (
         a, s, y,
         a.stride(0), a.stride(1), a.stride(2),
         s.stride(0), s.stride(1), s.stride(2),
         y.stride(0), y.stride(1), y.stride(2),
-        C, D, V, BV=BV,
+        C, D, V,
     )
+    cfg = _lookup_config(
+        "quad_apply", (C, D, V), torch.cuda.get_device_capability(a.device)
+    )
+    if cfg is None:
+        _quad_apply_kernel[lambda meta: (triton.cdiv(C, meta["BC"]), M)](
+            *args, BV=BV
+        )
+    else:
+        _quad_apply_kernel_static[(triton.cdiv(C, cfg["BC"]), M)](
+            *args, BV=BV, **cfg
+        )
     return y
 
 
@@ -459,15 +483,26 @@ def quad_update(
     # is passed twice and HAS_SHADOW switches the store off at compile time.
     target = shadow if shadow is not None else out
     BV = max(16, triton.next_power_of_2(V))
-    grid = lambda meta: (triton.cdiv(D, meta["BI"]), M)  # noqa: E731
-    _quad_update_kernel[grid](
+    args = (
         b, v, out, target,
         b.stride(0), b.stride(1), b.stride(2),
         v.stride(0), v.stride(1), v.stride(2),
         out.stride(0), out.stride(1), out.stride(2),
         target.stride(0), target.stride(1), target.stride(2),
-        C, D, V, BV=BV, HAS_SHADOW=shadow is not None,
+        C, D, V,
     )
+    has_shadow = shadow is not None
+    cfg = _lookup_config(
+        "quad_update", (C, D, V), torch.cuda.get_device_capability(b.device)
+    )
+    if cfg is None:
+        _quad_update_kernel[lambda meta: (triton.cdiv(D, meta["BI"]), M)](
+            *args, BV=BV, HAS_SHADOW=has_shadow
+        )
+    else:
+        _quad_update_kernel_static[(triton.cdiv(D, cfg["BI"]), M)](
+            *args, BV=BV, HAS_SHADOW=has_shadow, **cfg
+        )
 
 
 def causal_diag(a: torch.Tensor, b: torch.Tensor, v: torch.Tensor):
@@ -499,14 +534,24 @@ def causal_diag(a: torch.Tensor, b: torch.Tensor, v: torch.Tensor):
     num = torch.empty((M, C, V), device=a.device, dtype=torch.float32)
     den = torch.empty((M, C), device=a.device, dtype=torch.float32)
     BV = max(16, triton.next_power_of_2(V))
-    grid = lambda meta: (triton.cdiv(C, meta["BC"]), M)  # noqa: E731
-    _causal_diag_kernel[grid](
+    args = (
         a, b, v, num, den,
         a.stride(0), a.stride(1), a.stride(2),
         b.stride(0), b.stride(1), b.stride(2),
         v.stride(0), v.stride(1), v.stride(2),
         num.stride(0), num.stride(1), num.stride(2),
         den.stride(0), den.stride(1),
-        C, D, V, BV=BV,
+        C, D, V,
     )
+    cfg = _lookup_config(
+        "causal_diag", (C, D, V), torch.cuda.get_device_capability(a.device)
+    )
+    if cfg is None:
+        _causal_diag_kernel[lambda meta: (triton.cdiv(C, meta["BC"]), M)](
+            *args, BV=BV
+        )
+    else:
+        _causal_diag_kernel_static[(triton.cdiv(C, cfg["BC"]), M)](
+            *args, BV=BV, **cfg
+        )
     return num, den.unsqueeze(-1)
