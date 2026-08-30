@@ -1,0 +1,55 @@
+"""Polynomial attention for official case 14, with a fused Triton back end.
+
+Routing is decided by ``src.implementations.poly_guard``: when the measured
+score spread leaves the validated range, the caller falls back to exact Flash
+SDPA. See ``research/attention-softmax/triton-kernel-spec.md``.
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+import torch
+
+from src.implementations.poly_reference import poly_linear_attention
+from src.kernels import HAS_TRITON
+
+CHUNK = 512
+EXACT_PREFIX = 4096
+
+
+def poly_attention_forward(
+    q: torch.Tensor,
+    k: torch.Tensor,
+    v: torch.Tensor,
+    scale: float,
+    *,
+    sigma: Optional[float],
+    use_triton: bool = True,
+) -> torch.Tensor:
+    """Causal polynomial attention over ``[B, H, N, D]`` tensors.
+
+    The master state is float32 unconditionally. A float16 state is faster and
+    silently wrong at scale -- it passes at N=16384 and fails at N=65536 with
+    1,064,935 failures -- so it is not exposed as an option.
+
+    The fused kernels are used only for float16 CUDA inputs, which is what case
+    14's route supplies. Everything else falls through to dense PyTorch, which
+    computes the same function.
+    """
+    apply_fn = update_fn = None
+    if use_triton and HAS_TRITON and q.is_cuda and q.dtype == torch.float16:
+        from src.kernels.poly_attention_triton import quad_apply, quad_update
+
+        apply_fn, update_fn = quad_apply, quad_update
+
+    return poly_linear_attention(
+        q, k, v, scale,
+        chunk=CHUNK,
+        exact_prefix=EXACT_PREFIX,
+        sigma=sigma,
+        state_dtype=torch.float32,
+        compute_dtype=torch.float16,
+        quad_apply=apply_fn,
+        quad_update=update_fn,
+    )
