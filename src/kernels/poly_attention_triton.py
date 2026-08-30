@@ -31,6 +31,7 @@ import torch
 
 from src.kernels import HAS_TRITON
 from src.kernels.poly_configs import lookup as _measured_config
+from src.kernels.poly_configs import padded_chunk_size as _padded_chunk_size
 
 # Benchmark switch only. Setting it False forces every launch back onto the
 # narrow autotune, so the pre-F4 path can run as a second arm in the SAME
@@ -434,6 +435,12 @@ def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
             f"state shape {tuple(s.shape)} does not match a {tuple(a.shape)}"
         )
     V = s.shape[2]
+    original_c = C
+    capability = torch.cuda.get_device_capability(a.device)
+    padded_c = _padded_chunk_size((M, C, D, V), capability)
+    if padded_c is not None:
+        a = torch.nn.functional.pad(a, (0, 0, 0, padded_c - C))
+        C = padded_c
     a = a.contiguous()
     s = s.contiguous()
     y = torch.empty((M, C, V), device=a.device, dtype=a.dtype)
@@ -446,7 +453,7 @@ def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
         C, D, V,
     )
     cfg = _lookup_config(
-        "quad_apply", (C, D, V), torch.cuda.get_device_capability(a.device)
+        "quad_apply", (M, C, D, V), capability
     )
     if cfg is None:
         _quad_apply_kernel[lambda meta: (triton.cdiv(C, meta["BC"]), M)](
@@ -456,7 +463,7 @@ def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
         _quad_apply_kernel_static[(triton.cdiv(C, cfg["BC"]), M)](
             *args, BV=BV, **cfg
         )
-    return y
+    return y[:, :original_c]
 
 
 def quad_update(
@@ -511,7 +518,7 @@ def quad_update(
     )
     has_shadow = shadow is not None
     cfg = _lookup_config(
-        "quad_update", (C, D, V), torch.cuda.get_device_capability(b.device)
+        "quad_update", (M, C, D, V), torch.cuda.get_device_capability(b.device)
     )
     if cfg is None:
         _quad_update_kernel[lambda meta: (triton.cdiv(D, meta["BI"]), M)](
@@ -546,6 +553,15 @@ def causal_diag(a: torch.Tensor, b: torch.Tensor, v: torch.Tensor):
     if v.shape[0] != M or v.shape[1] != C:
         raise ValueError(f"v shape {tuple(v.shape)} does not match a {tuple(a.shape)}")
     V = v.shape[2]
+    original_c = C
+    capability = torch.cuda.get_device_capability(a.device)
+    padded_c = _padded_chunk_size((M, C, D, V), capability)
+    if padded_c is not None:
+        pad = (0, 0, 0, padded_c - C)
+        a = torch.nn.functional.pad(a, pad)
+        b = torch.nn.functional.pad(b, pad)
+        v = torch.nn.functional.pad(v, pad)
+        C = padded_c
     a = a.contiguous()
     b = b.contiguous()
     v = v.contiguous()
@@ -562,7 +578,7 @@ def causal_diag(a: torch.Tensor, b: torch.Tensor, v: torch.Tensor):
         C, D, V,
     )
     cfg = _lookup_config(
-        "causal_diag", (C, D, V), torch.cuda.get_device_capability(a.device)
+        "causal_diag", (M, C, D, V), capability
     )
     if cfg is None:
         _causal_diag_kernel[lambda meta: (triton.cdiv(C, meta["BC"]), M)](
@@ -572,4 +588,4 @@ def causal_diag(a: torch.Tensor, b: torch.Tensor, v: torch.Tensor):
         _causal_diag_kernel_static[(triton.cdiv(C, cfg["BC"]), M)](
             *args, BV=BV, **cfg
         )
-    return num, den.unsqueeze(-1)
+    return num[:, :original_c], den[:, :original_c].unsqueeze(-1)

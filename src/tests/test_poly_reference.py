@@ -168,6 +168,29 @@ class PolyReferenceTests(unittest.TestCase):
         )
         self.assertLess((skipped - full).abs().max().item(), 1e-5)
 
+    def test_final_state_update_can_be_skipped(self):
+        """The terminal state is dead because no later chunk can read it."""
+        from src.implementations.poly_reference import poly_linear_attention
+
+        q, k, v, scale = self._qkv(N=1024)
+        calls = []
+
+        def counting_update(b, vc, out, shadow=None):
+            calls.append(b.shape[1])
+
+        kw = dict(
+            chunk=256, exact_prefix=0, sigma=0.334,
+            quad_update=counting_update, **self.CPU_KW,
+        )
+        full = poly_linear_attention(q, k, v, scale, **kw)
+        self.assertEqual(len(calls), 4)
+        calls.clear()
+        skipped = poly_linear_attention(
+            q, k, v, scale, skip_final_state_update=True, **kw
+        )
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(torch.equal(full, skipped))
+
 
 if __name__ == "__main__":
     unittest.main()

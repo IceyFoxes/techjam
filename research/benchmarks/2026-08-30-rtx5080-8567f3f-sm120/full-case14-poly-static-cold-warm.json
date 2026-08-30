@@ -1,0 +1,63 @@
+{
+  "batch_chunk_size": 1,
+  "command": "/home/kevin/techjam/.venv/bin/python src/extreme_smoke.py --case 14 --dtype float16 --seed 1234 --forwards 2 --output research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/full-case14-poly-static-cold-warm.json",
+  "config": {
+    "batch_size": 32,
+    "causal": true,
+    "d_model": 1024,
+    "ffn_dim": 1024,
+    "num_heads": 16,
+    "num_layers": 2,
+    "seq_len": 100000
+  },
+  "dtype": "float16",
+  "elapsed_seconds": 20.879014181002276,
+  "elapsed_seconds_by_forward": [
+    20.879014181002276,
+    11.989872776000993
+  ],
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665357959168,
+      "path": "/tmp/techjam-pr16-sm120",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "8567f3f4252b50e9808fa1a19265bb641121f549",
+    "dirty": true,
+    "status": "M src/dispatcher.py\n M src/extreme_smoke.py\n M src/implementations/extreme.py\n M src/kernels/poly_attention_triton.py\n M src/kernels/poly_configs.py\n M src/sweep_poly_configs.py\n M src/tests/test_dispatcher.py\n M src/tests/test_poly_attention.py\n M src/tests/test_poly_configs.py\n?? research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/"
+  },
+  "numerical_correctness": "not checked: immutable Case 14 baseline is not runnable at this scale",
+  "official_case_id": 14,
+  "output_finite": true,
+  "output_shape": [
+    32,
+    100000,
+    1024
+  ],
+  "padding_ratio": 0.0,
+  "peak_allocated_bytes": 21161491456,
+  "peak_allocated_bytes_by_forward": [
+    14607891456,
+    21161491456
+  ],
+  "peak_reserved_bytes": 21290287104,
+  "peak_reserved_bytes_by_forward": [
+    14736687104,
+    21290287104
+  ],
+  "route": "extreme-memory",
+  "schema_version": 1,
+  "timestamp_utc": "2026-08-30T11:10:22.079125+00:00"
+}

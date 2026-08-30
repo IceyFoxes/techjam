@@ -70,15 +70,15 @@ class FusedPathTests(unittest.TestCase):
 
 @unittest.skipIf(torch is None, "PyTorch is not installed")
 class PolyRouteToggleTests(unittest.TestCase):
-    """The route must be opt-in and reversible in one flag.
+    """The promoted route must remain reversible in one flag.
 
     These are CPU-only: they exercise the routing decision, not the kernel.
     """
 
-    def test_disabled_by_default(self):
+    def test_enabled_by_default_after_full_case_acceptance(self):
         from src.implementations import extreme
 
-        self.assertFalse(extreme.POLY_ATTENTION_ENABLED)
+        self.assertTrue(extreme.POLY_ATTENTION_ENABLED)
 
     def test_disabled_flag_selects_the_flash_path(self):
         from src.implementations.extreme import PolyOrFlashSelfAttention
