@@ -1,10 +1,10 @@
-"""Shape-aware integration candidate for the twelve feasible official cases.
+"""Shape-aware integration candidate for all fourteen official cases.
 
 The evaluator constructs the model on CPU, copies reference weights, and only
 then moves it to the final device and dtype. Compilation is therefore lazy and
 per model instance. Unvalidated runtime contracts use the executable reference
-arithmetic. Extreme cases 6 and 14 fail before dense execution because that
-fallback is itself unsafe at their disclosed sizes.
+arithmetic. Extreme cases use separately guarded memory-safe execution because
+their dense fallback is unsafe at the disclosed sizes.
 """
 
 from __future__ import annotations
@@ -25,6 +25,13 @@ from src.implementations.sdpa import (
     PackedQKVSDPASelfAttention,
     StridedSDPASelfAttention,
 )
+from src.implementations.extreme import (
+    CASE_14_CONFIG,
+    FlashOnlySDPASelfAttention,
+    choose_batch_chunk_size,
+    forward_batch_chunks,
+    forward_prefix_chunks,
+)
 from src.infra import CandidateSpec, OfficialCase, load_official_cases
 
 
@@ -33,10 +40,10 @@ ForwardCallable = Callable[[torch.Tensor, Optional[torch.Tensor]], torch.Tensor]
 
 REFERENCE_BACKEND = "reference"
 COMPILED_SDPA_BACKEND = "compiled-sdpa"
+EXTREME_MEMORY_BACKEND = "extreme-memory"
 UNSUPPORTED_BACKEND = "unsupported"
 
-# Cases 6 and 14 are intentionally absent. Their extreme batch/sequence sizes
-# need the separately owned memory-safe backend before they can be promoted.
+# Extreme cases use eager chunking and are intentionally absent here.
 CASE_COMPILE_MODES: Dict[int, str] = {
     1: "reduce-overhead",
     2: "reduce-overhead",
@@ -155,12 +162,50 @@ def select_route(
             None,
             "configuration is not an official disclosed case",
         )
-    if case_id not in CASE_COMPILE_MODES:
+    if case_id in (6, 14):
+        if device_type != "cuda":
+            return RouteDecision(
+                case_id,
+                UNSUPPORTED_BACKEND,
+                None,
+                "extreme memory-safe route requires CUDA",
+            )
+        if (
+            device_capability is None
+            or device_capability < MIN_COMPILED_CUDA_CAPABILITY
+        ):
+            return RouteDecision(
+                case_id,
+                UNSUPPORTED_BACKEND,
+                None,
+                "extreme memory-safe route requires Ampere or newer",
+            )
+        if torch_version != VALIDATED_TORCH_VERSION:
+            return RouteDecision(
+                case_id,
+                UNSUPPORTED_BACKEND,
+                None,
+                "PyTorch build is outside the extreme backend contract",
+            )
+        if case_id == 6 and dtype != torch.float32:
+            return RouteDecision(
+                case_id,
+                UNSUPPORTED_BACKEND,
+                None,
+                "Case 6 currently requires float32",
+            )
+        if case_id == 14 and dtype != torch.float16:
+            return RouteDecision(
+                case_id,
+                UNSUPPORTED_BACKEND,
+                None,
+                "Case 14 requires float16 for memory and numerical correctness",
+            )
         return RouteDecision(
             case_id,
-            UNSUPPORTED_BACKEND,
+            EXTREME_MEMORY_BACKEND,
             None,
-            "extreme case has no memory-safe backend",
+            "eligible memory-safe extreme route",
         )
     if device_type != "cuda":
         return RouteDecision(
@@ -223,11 +268,13 @@ class DispatchingTransformer(BaselineTransformer):
 
     def __init__(self, config: TransformerConfig) -> None:
         super().__init__(config)
-        attention_type = (
-            PackedQKVSDPASelfAttention
-            if OFFICIAL_CASE_BY_CONFIG.get(_config_key(config)) in PACKED_QKV_CASES
-            else StridedSDPASelfAttention
-        )
+        case_id = OFFICIAL_CASE_BY_CONFIG.get(_config_key(config))
+        if _config_key(config) == CASE_14_CONFIG:
+            attention_type = FlashOnlySDPASelfAttention
+        elif case_id in PACKED_QKV_CASES:
+            attention_type = PackedQKVSDPASelfAttention
+        else:
+            attention_type = StridedSDPASelfAttention
         for layer in self.layers:
             layer.attention = attention_type(
                 config.d_model,
@@ -241,6 +288,7 @@ class DispatchingTransformer(BaselineTransformer):
             Tuple[Optional[str], Optional[Tuple[int, int]]],
         ] = {}
         self._last_route: Optional[RouteDecision] = None
+        self._last_extreme_chunk_size: Optional[int] = None
 
     @property
     def last_route(self) -> Optional[RouteDecision]:
@@ -254,6 +302,12 @@ class DispatchingTransformer(BaselineTransformer):
 
         return dict(self._compile_failures)
 
+    @property
+    def last_extreme_chunk_size(self) -> Optional[int]:
+        """Most recently selected batch chunk for an extreme route."""
+
+        return self._last_extreme_chunk_size
+
     def clear_runtime_cache(self) -> None:
         """Discard callables bound to the current parameter/device state."""
 
@@ -261,6 +315,7 @@ class DispatchingTransformer(BaselineTransformer):
         self._compile_failures.clear()
         self._device_contracts.clear()
         self._last_route = None
+        self._last_extreme_chunk_size = None
 
     def _apply(
         self,
@@ -310,8 +365,15 @@ class DispatchingTransformer(BaselineTransformer):
         It is therefore called only on a cache miss, alongside compilation,
         which costs far more. Calling it per forward would cost roughly 70% of
         case 2's compiled runtime and erase the gain it buys.
+
+        The extreme routes are eligible too. They are eager and chunked, so the
+        synchronization neither breaks graph replay nor adds a cost they do not
+        already pay: case 14's prefix streaming already reads the mask on the
+        host. Case 6 is where this actually pays, because it streams the mask
+        through to SDPA; case 14 trims to valid prefixes and passes None, so the
+        flag is inert there.
         """
-        if route.backend != COMPILED_SDPA_BACKEND:
+        if route.backend not in (COMPILED_SDPA_BACKEND, EXTREME_MEMORY_BACKEND):
             # The reference fallback must reproduce the baseline exactly.
             return False
         if not self.config.causal or valid_token_mask is None:
@@ -345,6 +407,21 @@ class DispatchingTransformer(BaselineTransformer):
     def _forward_case_5(self, x, valid_token_mask=None):
         return self._forward_sdpa(x, valid_token_mask)
 
+    def _forward_case_6(self, x, valid_token_mask=None):
+        chunk_size = choose_batch_chunk_size(
+            x,
+            self.config.num_heads,
+            score_copies=12,
+            activation_copies=12,
+        )
+        self._last_extreme_chunk_size = chunk_size
+        return forward_batch_chunks(
+            self._forward_sdpa,
+            x,
+            valid_token_mask,
+            chunk_size,
+        )
+
     def _forward_case_7(self, x, valid_token_mask=None):
         return self._forward_sdpa(x, valid_token_mask)
 
@@ -365,6 +442,27 @@ class DispatchingTransformer(BaselineTransformer):
 
     def _forward_case_13(self, x, valid_token_mask=None):
         return self._forward_sdpa(x, valid_token_mask)
+
+    def _forward_case_14(self, x, valid_token_mask=None):
+        chunk_size = choose_batch_chunk_size(
+            x,
+            self.config.num_heads,
+            score_copies=0,
+            activation_copies=12,
+        )
+        self._last_extreme_chunk_size = chunk_size
+        return forward_prefix_chunks(
+            self._forward_sdpa,
+            x,
+            valid_token_mask,
+            chunk_size,
+        )
+
+    def _extreme_entrypoint(self, case_id: int) -> ForwardCallable:
+        return {
+            6: self._forward_case_6,
+            14: self._forward_case_14,
+        }[case_id]
 
     def _compile_entrypoint(self, case_id: int) -> ForwardCallable:
         entrypoints = {
@@ -460,11 +558,13 @@ class DispatchingTransformer(BaselineTransformer):
             self.config.d_model,
         )
         if key.input_shape != expected_shape:
+            case_id = OFFICIAL_CASE_BY_CONFIG.get(_config_key(self.config))
             return RouteDecision(
-                OFFICIAL_CASE_BY_CONFIG.get(_config_key(self.config)),
-                REFERENCE_BACKEND,
+                case_id,
+                UNSUPPORTED_BACKEND if case_id in (6, 14) else REFERENCE_BACKEND,
                 None,
-                "runtime input shape does not match the static configuration",
+                "runtime input shape does not match the static configuration; "
+                "dense extreme fallback is disabled",
             )
         return select_route(
             self.config,
@@ -538,6 +638,24 @@ class DispatchingTransformer(BaselineTransformer):
                 drop_key_mask=False,
             )
             return self._forward_reference(x, valid_token_mask)
+        if route.backend == EXTREME_MEMORY_BACKEND:
+            if not key.inference_mode or key.grad_enabled:
+                raise UnsupportedCaseError(
+                    f"official case {route.case_id} extreme route is inference-only"
+                )
+            assert route.case_id is not None
+            # Set explicitly rather than relying on the class-level default, so
+            # this route cannot inherit a stale flag from an earlier forward.
+            drop_key_mask = self._may_drop_key_mask(route, valid_token_mask)
+            self._set_drop_key_mask(drop_key_mask)
+            function = self._extreme_entrypoint(route.case_id)
+            self._compiled_forwards[key] = CachedForward(
+                function,
+                compiled=False,
+                case_id=route.case_id,
+                drop_key_mask=drop_key_mask,
+            )
+            return function(x, valid_token_mask)
 
         assert route.compile_mode is not None
         assert route.case_id is not None
@@ -577,9 +695,20 @@ CANDIDATE = CandidateSpec(
     model_factory=DispatchingTransformer,
     owner="Person 1 / integrator",
     description=(
-        "Lazy twelve-case float32 CUDA dispatcher: Cases 2/3 packed QKV, "
-        "strided-view SDPA, shape-specific compilation, and exact fallback."
+        "Fourteen-case CUDA dispatcher: Cases 2/3 packed QKV, compiled strided "
+        "SDPA, and memory-safe streamed routes for Cases 6 and 14."
     ),
     self_compiling=True,
-    unsupported_official_cases=(6, 14),
+    official_case_dtypes=(
+        (6, ("float32",)),
+        (14, ("float16",)),
+    ),
+    candidate_only_official_cases=(14,),
+    default_input_scale_only_cases=(14,),
+    cuda_only_official_cases=(6, 14),
+    official_case_min_cuda_capability=((6, (8, 0)), (14, (8, 0))),
+    official_case_torch_versions=(
+        (6, (VALIDATED_TORCH_VERSION,)),
+        (14, (VALIDATED_TORCH_VERSION,)),
+    ),
 )
