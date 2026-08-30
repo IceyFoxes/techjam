@@ -191,3 +191,67 @@ class QuadUpdateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+@unittest.skipIf(_cuda_missing(), "Triton kernels require CUDA")
+class QuadShadowTests(unittest.TestCase):
+    """The apply kernel reads a float16 shadow instead of the float32 master.
+
+    Every apply program reads the WHOLE state -- 8 full 1 MiB reads per chunk
+    per (batch, head) at BC=64, C=512 -- and the kernel converts it to float16
+    before its dot anyway. Writing the shadow once in the update kernel and
+    reading it in the apply kernel is therefore bitwise-identical and moves half
+    the bytes. The master stays float32: a float16 ACCUMULATOR passes at
+    N=16384 and fails at N=65536 with 1,064,935 failures, which is a different
+    thing entirely from a rounded copy of an exact master.
+    """
+
+    def _case(self, M=2, C=128, D=64, V=64, seed=0):
+        gen = torch.Generator(device="cuda").manual_seed(seed)
+        kw = dict(generator=gen, device="cuda", dtype=torch.float16)
+        b = torch.randn(M, C, D, **kw) * 0.2
+        v = torch.randn(M, C, V, **kw) * 0.2
+        state = torch.zeros(M, D * D, V, device="cuda", dtype=torch.float32)
+        return b, v, state
+
+    def test_shadow_is_the_float16_rounding_of_the_master(self):
+        from src.kernels.poly_attention_triton import quad_update
+
+        b, v, state = self._case()
+        shadow = torch.zeros_like(state, dtype=torch.float16)
+        quad_update(b, v, state, shadow=shadow)
+        self.assertEqual(state.dtype, torch.float32)
+        # Exactly the master, rounded -- not an independently accumulated value.
+        self.assertTrue(torch.equal(shadow, state.to(torch.float16)))
+
+    def test_applying_the_shadow_is_bitwise_identical_to_applying_the_master(self):
+        """The apply kernel already converted to float16 internally."""
+        from src.kernels.poly_attention_triton import quad_apply, quad_update
+
+        b, v, state = self._case()
+        shadow = torch.zeros_like(state, dtype=torch.float16)
+        quad_update(b, v, state, shadow=shadow)
+        gen = torch.Generator(device="cuda").manual_seed(7)
+        a = torch.randn(
+            2, 128, 64, generator=gen, device="cuda", dtype=torch.float16
+        ) * 0.2
+        self.assertTrue(torch.equal(quad_apply(a, state), quad_apply(a, shadow)))
+
+    def test_shadow_stays_in_step_across_repeated_updates(self):
+        from src.kernels.poly_attention_triton import quad_update
+
+        b, v, state = self._case()
+        shadow = torch.zeros_like(state, dtype=torch.float16)
+        for _ in range(4):
+            quad_update(b, v, state, shadow=shadow)
+        self.assertTrue(torch.equal(shadow, state.to(torch.float16)))
+
+    def test_master_must_still_be_float32(self):
+        """The fp16-accumulator trap must keep failing loudly."""
+        from src.kernels.poly_attention_triton import quad_update
+
+        b, v, state = self._case()
+        half_master = state.to(torch.float16)
+        with self.assertRaises(ValueError):
+            quad_update(b, v, half_master)
