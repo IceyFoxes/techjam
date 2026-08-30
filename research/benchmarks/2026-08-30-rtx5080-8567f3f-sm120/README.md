@@ -3,6 +3,7 @@
 Date: 2026-08-30 UTC
 
 Implementation commit: `4f02b5f` (based on PR 16 head `8567f3f`).
+Integrated branch commit: `3c5ae92` (current `master` merged locally).
 Branch base: `fecf9943d7cbf4b5e166862087a4a3bb6e21d868`, committed
 2026-08-30T10:52:00+08:00.
 
@@ -13,10 +14,13 @@ Triton kernels in the first official forward is not. The accepted RTX 5080
 policy keeps only the measured static `quad_update` kernel and uses the PyTorch
 polynomial apply and diagonal paths. It also skips the dead final state update.
 
-Across two independent fresh-process runs, candidate cold latency was
-11.407-11.693 s. Exact Flash was 14.680-21.309 s. Comparing the fastest exact
-control with the slowest candidate gives a conservative **1.255x cold speedup**.
-Warm latency conservatively improves from 14.189 to 10.308 s, **1.376x**.
+Before the master merge, two fresh-process candidate runs measured
+11.407-11.693 s cold. After the merge and full test suite heated the GPU, an
+order-reversed bracket measured candidate 13.898 s, exact Flash 21.261 s, then
+candidate 14.545 s. The paired cold speedup is therefore **1.462-1.530x under
+both orderings**. Every candidate cold sample is faster than every exact sample;
+the deliberately over-conservative cross-session extreme is 14.680 / 14.545 =
+1.009x and is not used as the performance claim.
 
 ## Three reference points
 
@@ -24,12 +28,13 @@ Warm latency conservatively improves from 14.189 to 10.308 s, **1.376x**.
 | --- | --- | --- | ---: | ---: |
 | Immutable dense baseline | root `torch_transformer_benchmark.py` | UNSUPPORTED at full shape: dense scores need about 9.31 TiB; dense oracle at N=8192 PASS | — | — |
 | Branch base exact Flash | `fecf994` | finite output; algebraically exact memory-safe route | 16.886 s | 13,931.858 MiB |
-| Latest measured policy | `4f02b5f` | dense N=8192 PASS; Flash N=100000 PASS; full output finite | 11.407-11.693 s cold | 13,931.858 MiB |
+| Latest measured policy | `3c5ae92` (`4f02b5f` implementation) | dense N=8192 PASS; Flash N=100000 PASS; full output finite | 11.407-14.545 s cold; 13.898-14.545 s post-merge | 13,931.858 MiB |
 
 The branch-base record is
 `research/benchmarks/2026-08-30-rtx5080-b9506f3/full-case14-exact-flash.json`
-on `master`. Against that recorded 16.886 s result, the slower candidate cold
-run is 1.444x faster. The 1.255x figure above is the stricter same-code control.
+on `master`. Against that recorded 16.886 s result, even the slowest candidate
+cold run is 1.161x faster. The bracketed same-code comparison above controls
+the large thermal drift more directly.
 
 Case 14 cannot satisfy the validation skill's normal full immutable-baseline
 comparison because constructing the dense score tensor is infeasible. This is
@@ -44,7 +49,7 @@ Official criterion: `abs(error) <= 0.002 OR abs(error) <= 0.02 * abs(reference)`
 ```text
 N=8192 oracle=dense wscale=1.0 sigma=0.3335 failures=0/8388608 max=5.8594e-03 rms=3.3700e-04 PASS
 N=100000 oracle=flash wscale=1.0 sigma=0.3339 failures=0/102400000 max=7.8125e-03 rms=3.4854e-04 PASS
-Ran 200 tests in 60.754s — OK
+Ran 200 tests in 39.437s after merging current master — OK
 ```
 
 Commands:
@@ -70,6 +75,9 @@ and the second is warm. No warm-up was hidden outside the timer.
 | Apply kernel only | 15.814 s | 10.304 s | reject: compile cost |
 | **Update kernel only** | **11.407 s** | **10.308 s** | **accept** |
 | **Update kernel only, independent repeat** | **11.693 s** | **9.845 s** | **accept** |
+| **Post-merge candidate, before exact** | **13.898 s** | **12.319 s** | **accept; hot-GPU bracket** |
+| Post-merge exact Flash | 21.261 s | 20.912 s | bracketed control |
+| **Post-merge candidate, after exact** | **14.545 s** | **13.143 s** | **accept; reverse order** |
 
 Records:
 
@@ -81,6 +89,9 @@ Records:
 - `full-case14-poly-updateonly-cold-warm.json`
 - `final-case14-poly-cold-warm-repeat.json`
 - `final-case14-exact-cold-warm-repeat.json`
+- `postmerge-case14-poly-cold-warm.json`
+- `postmerge-case14-exact-cold-warm.json`
+- `postmerge-reverse-case14-poly-cold-warm.json`
 
 `full-case14-poly-static-cold-warm.json` is **invalid for peak and warm-time
 comparison**: the first version of the two-forward runner left the loop's final

@@ -1,0 +1,65 @@
+{
+  "batch_chunk_size": 1,
+  "command": "/home/kevin/techjam/.venv/bin/python src/extreme_smoke.py --case 14 --dtype float16 --seed 1234 --forwards 2 --output research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/postmerge-reverse-case14-poly-cold-warm.json",
+  "config": {
+    "batch_size": 32,
+    "causal": true,
+    "d_model": 1024,
+    "ffn_dim": 1024,
+    "num_heads": 16,
+    "num_layers": 2,
+    "seq_len": 100000
+  },
+  "dtype": "float16",
+  "elapsed_seconds": 14.54523398099991,
+  "elapsed_seconds_by_forward": [
+    14.54523398099991,
+    13.142682965000859
+  ],
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665296539648,
+      "path": "/tmp/techjam-pr16-sm120",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "3c5ae928efa6bde729c13961ad8c7dd286189a1d",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/postmerge-case14-exact-cold-warm.json\n?? research/benchmarks/2026-08-30-rtx5080-8567f3f-sm120/postmerge-case14-poly-cold-warm.json"
+  },
+  "numerical_correctness": "not checked: immutable Case 14 baseline is not runnable at this scale",
+  "official_case_id": 14,
+  "output_finite": true,
+  "output_shape": [
+    32,
+    100000,
+    1024
+  ],
+  "padding_ratio": 0.0,
+  "peak_allocated_bytes": 14608612352,
+  "peak_allocated_bytes_by_forward": [
+    14608612352,
+    14608612352
+  ],
+  "peak_reserved_bytes": 14740881408,
+  "peak_reserved_bytes_by_forward": [
+    14740881408,
+    14740881408
+  ],
+  "poly_disabled": false,
+  "poly_disabled_optimizations": [],
+  "route": "extreme-memory",
+  "schema_version": 1,
+  "timestamp_utc": "2026-08-30T11:31:31.318036+00:00"
+}
