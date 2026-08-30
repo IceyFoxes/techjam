@@ -212,10 +212,21 @@ def _selected_models(
 def main() -> int:
     args = parse_args()
     spec = load_candidate(args.candidate)
+    device, dtype = _configure(args)
     validate_candidate_execution(
         spec,
         args.case,
         compile_user=args.compile_user,
+        dtype_name=args.dtype,
+        candidate_only=args.models == "candidate",
+        input_scale=args.input_scale,
+        device_type=device.type,
+        cuda_capability=(
+            torch.cuda.get_device_capability(device)
+            if device.type == "cuda"
+            else None
+        ),
+        torch_version=torch.__version__,
     )
     if args.output_dir is None:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -225,7 +236,6 @@ def main() -> int:
             / f"{timestamp}-{spec.name}-case{args.case}"
         )
     args.output_dir.mkdir(parents=True, exist_ok=False)
-    device, dtype = _configure(args)
     official_case = load_official_cases()[args.case]
     shape = official_case.benchmark_config()
     config = reference.TransformerConfig(
@@ -271,6 +281,13 @@ def main() -> int:
             "strict_weight_copy": strict,
             "self_compiling": spec.self_compiling,
             "unsupported_official_cases": list(spec.unsupported_official_cases),
+            "official_case_dtypes": dict(spec.official_case_dtypes),
+            "candidate_only_official_cases": list(
+                spec.candidate_only_official_cases
+            ),
+            "default_input_scale_only_cases": list(
+                spec.default_input_scale_only_cases
+            ),
         },
         "official_case_id": args.case,
         "config": asdict(config),
