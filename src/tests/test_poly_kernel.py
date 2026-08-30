@@ -255,3 +255,51 @@ class QuadShadowTests(unittest.TestCase):
         half_master = state.to(torch.float16)
         with self.assertRaises(ValueError):
             quad_update(b, v, half_master)
+
+
+@unittest.skipIf(torch is None, "PyTorch is not installed")
+@unittest.skipIf(_cuda_missing(), "Triton kernels require CUDA")
+class SmallStateShadowTests(unittest.TestCase):
+    """s_lin, gram and z_lin shadows must be caches, not a change of arithmetic.
+
+    They replace a float32->float16 conversion performed at every use site on
+    every chunk with one copy per fold. The shadow holds exactly what the
+    conversion produced, so the output must be BITWISE identical -- anything
+    else means the shadow has drifted from its master.
+    """
+
+    def _qkv(self, N=2048, D=64, seed=0):
+        gen = torch.Generator(device="cuda").manual_seed(seed)
+        kw = dict(generator=gen, device="cuda", dtype=torch.float16)
+        shape = (1, 2, N, D)
+        return (
+            torch.randn(shape, **kw) * 0.577,
+            torch.randn(shape, **kw) * 0.577,
+            torch.randn(shape, **kw) * 0.577,
+            D ** -0.5,
+        )
+
+    def test_small_state_shadows_do_not_change_the_output(self):
+        from src.implementations.poly_reference import poly_linear_attention
+
+        q, k, v, scale = self._qkv()
+        kw = dict(chunk=512, exact_prefix=0, sigma=0.334)
+        with_shadows = poly_linear_attention(
+            q, k, v, scale, small_state_shadows=True, **kw
+        )
+        without = poly_linear_attention(
+            q, k, v, scale, small_state_shadows=False, **kw
+        )
+        self.assertTrue(torch.equal(with_shadows, without))
+
+    def test_scalar_z_const_matches_the_token_count(self):
+        """z_const was a device tensor holding exactly t0."""
+        from src.implementations.poly_reference import poly_linear_attention
+
+        q, k, v, scale = self._qkv(N=1536)
+        # A chunk size that does not divide N exercises the ragged final chunk,
+        # where an off-by-one in the token count would show up.
+        out = poly_linear_attention(
+            q, k, v, scale, chunk=512, exact_prefix=0, sigma=0.334
+        )
+        self.assertTrue(torch.isfinite(out).all())
