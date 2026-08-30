@@ -1,0 +1,150 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.0014080405235290527,
+    "max_relative_error": 26187.369140625,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 163840000,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0014080405235290527,
+        "max_relative_error": 26187.369140625,
+        "mean_abs_error": 9.289655281463638e-05,
+        "optimized_at_worst": -0.649403989315033,
+        "passed": true,
+        "reference_at_worst": -0.650812029838562,
+        "seed": 1234,
+        "total_elements": 163840000,
+        "trial": 1,
+        "worst_index": [
+          9283,
+          2,
+          13
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "candidate_only_official_cases": [
+      14
+    ],
+    "default_input_scale_only_cases": [
+      14
+    ],
+    "description": "Fourteen-case CUDA dispatcher: Case-2 packed QKV, compiled strided SDPA, and memory-safe streamed routes for Cases 6 and 14.",
+    "name": "dispatcher",
+    "official_case_dtypes": {
+      "6": [
+        "float32"
+      ],
+      "14": [
+        "float16"
+      ]
+    },
+    "owner": "Person 1 / integrator",
+    "selector": "src.dispatcher",
+    "self_compiling": true,
+    "strict_weight_copy": true,
+    "unsupported_official_cases": []
+  },
+  "command": "/home/ec2-user/techjam/.venv/bin/python /home/ec2-user/techjam/src/benchmark.py --candidate src.dispatcher --case 6 --device cuda --dtype float32 --accuracy-trials 1 --timing legacy --warmup 1 --repeats 1 --benchmark-rounds 1 --settle-seconds 0 --output research/benchmarks/2026-08-29-l4-f128f6e/case6.json",
+  "config": {
+    "batch_size": 10000,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 4,
+    "num_layers": 4,
+    "seq_len": 128
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 535046815744,
+      "path": "/home/ec2-user/techjam",
+      "total_bytes": 579740872704
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "580.95.05",
+      "name": "NVIDIA L4"
+    },
+    "os": "Linux-6.1.158-178.288.amzn2023.x86_64-x86_64-with-glibc2.34",
+    "python": "3.12.10",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "f128f6ee6a40619d5b92bc92b91d60d13d266f15",
+    "dirty": false,
+    "status": ""
+  },
+  "input_scale": 1.0,
+  "nvtx_enabled": false,
+  "official_case_id": 6,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.0,
+  "performance": {
+    "baseline": {
+      "mean_ms": 1129.343017578125,
+      "median_ms": 1129.343017578125,
+      "min_ms": 1129.343017578125,
+      "p90_ms": 1129.343017578125,
+      "samples_ms": [
+        1129.343017578125
+      ],
+      "tokens_per_second": 1133402.3233658085
+    },
+    "candidate": {
+      "mean_ms": 454.0200500488281,
+      "median_ms": 454.0200500488281,
+      "min_ms": 454.0200500488281,
+      "p90_ms": 454.0200500488281,
+      "samples_ms": [
+        454.0200500488281
+      ],
+      "tokens_per_second": 2819258.7526968047
+    },
+    "gpu_state": {
+      "clocks.mem": "6251",
+      "clocks.sm": "1530",
+      "clocks_throttle_reasons.active": "0x0000000000000004",
+      "power.draw": "72.64",
+      "power.limit": "72.00",
+      "temperature.gpu": "43"
+    },
+    "memory": {
+      "baseline": {
+        "before_allocated_bytes": 669396992,
+        "before_reserved_bytes": 11813257216,
+        "incremental_peak_allocated_bytes": 10496724992,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 11166121984,
+        "peak_reserved_bytes": 11813257216
+      },
+      "candidate": {
+        "before_allocated_bytes": 669396992,
+        "before_reserved_bytes": 11813257216,
+        "incremental_peak_allocated_bytes": 2804416512,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 3473813504,
+        "peak_reserved_bytes": 11813257216
+      }
+    },
+    "repeats": 1,
+    "rounds": 1,
+    "speedup": 2.4874298336751175,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "legacy",
+    "warmup_iterations": 1
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-29T19:53:17.743215+00:00"
+}
