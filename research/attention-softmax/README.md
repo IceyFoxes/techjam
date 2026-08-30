@@ -4,7 +4,7 @@ Research for the `QK^T` / causal softmax / `PV` region of the Transformer layer,
 owned by Person 2 per
 [`four-way-team-split.md`](../team-coordination/four-way-team-split.md).
 
-Status: current as of 30 August 2026.
+Status: current as of 31 August 2026.
 
 ## Documents
 
@@ -21,7 +21,15 @@ Status: current as of 30 August 2026.
   stages each one removes.
 - [`sdpa-and-precision.md`](sdpa-and-precision.md) — why the target is float32 +
   `scaled_dot_product_attention`, why float16 was rejected on correctness, and how
-  much of the tolerance budget TF32 has already spent.
+  much of the tolerance budget TF32 has already spent. **Its blanket dtype
+  conclusion is narrowed as of 31 August 2026**: the float16-reference rejection
+  remains valid, but it does not prove that FP16 internal compute behind an FP32
+  interface always fails. See
+  [`fp16-interface-followup.md`](fp16-interface-followup.md).
+- [`fp16-interface-followup.md`](fp16-interface-followup.md) — separates the
+  float16-reference contract from FP32-interface mixed precision, records the
+  Case-14 five-trial pass and a one-seed cases 1-13 diagnostic, and defines the
+  new per-shape promotion rule.
 - [`measurements.md`](measurements.md) — environment, operator-level attribution,
   and every measured speedup with its noise floor.
 - [`fast-attention-survey.md`](fast-attention-survey.md) — idea catalogue of ~20
@@ -78,11 +86,15 @@ conclusions 1 and 8 for that case.
    actual matmul (~6.9 ms). Removing the score tensor from memory is the whole
    problem; faster matmuls are nearly worthless.
 
-2. **float32 is the only viable dtype.** In float16 the criterion fails for *any*
-   arithmetic reassociation — even folding the `scale` into `Q` breaks cases 7
-   and 13, and SDPA fails on 0/8 to 5/8 seeds depending on case. The cause is
-   that the reference rounds softmax probabilities back to float16 before the
-   `PV` matmul, so a fused kernel is *more* accurate and therefore deviates.
+2. **Narrowed 31 August 2026: float32 remains the accepted default for these
+   cases, but is not proven to be the only viable internal dtype.** The original
+   float16-reference test still rejects arithmetic reassociation — even folding
+   the `scale` into `Q` breaks cases 7 and 13, and SDPA passes only 0/8 to 5/8
+   seeds depending on case — because the reference rounds probabilities back to
+   float16 before `PV`. A separate FP32-reference/FP16-internal diagnostic passes
+   one seed on cases 2, 3, 4, 9, 11, and 12, but fails the other seven. See
+   [`fp16-interface-followup.md`](fp16-interface-followup.md); no new short-case
+   route is accepted without multi-seed correctness and performance evidence.
 
 3. **float32 SDPA gains on all twelve in-scope cases, geomean ≈1.94x**, and all
    twelve pass the official criterion. Best: case 13 at 6.34x (±2.6%), case 11 at
