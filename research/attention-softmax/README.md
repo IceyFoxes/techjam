@@ -32,7 +32,18 @@ Status: current as of 29 August 2026.
   `long-sequence-attention.md` and does not hold at N=100000.
 - [`triton-kernel-spec.md`](triton-kernel-spec.md) — implementation spec for the
   fused kernel: phasing, the two Triton kernels, precision rules, the runtime
-  `sigma` guard, and the acceptance thresholds.
+  `sigma` guard, and the acceptance thresholds. **Section 8 superseded
+  30 August 2026** by [`integrated-kernel-spec.md`](integrated-kernel-spec.md):
+  its Phase 2 sketch proposed a two-level sequence-parallel scan to fix an
+  occupancy problem ("16 programs against 24 SMs") that the shipped kernels do
+  not have — they launch 256 and 2048 programs at B=2. Sections 1-7 and 8.2
+  remain current and are inherited by the Phase 2 spec unchanged.
+- [`integrated-kernel-spec.md`](integrated-kernel-spec.md) — Phase 2 spec: fold
+  the remaining per-chunk PyTorch work into the kernels. Staged as six
+  individually A/B'd redundancy fixes (led by a causal-tiled diagonal block),
+  then two complete per-chunk kernels, with a persistent-slab scan specified but
+  gated on measurement. Opens with a blocking noise-floor task, because four
+  identical profiles on this hardware spread 2.17x.
 - [`triton-kernel-prior-art.md`](triton-kernel-prior-art.md) — what already
   exists for the proposed fused kernel. Key finding: `flash-linear-attention`
   implements this exact algorithm but asserts head dimension <= 16, and Based
