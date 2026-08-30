@@ -72,6 +72,7 @@ def poly_linear_attention(
     quad_apply: Optional[Callable] = None,
     quad_update: Optional[Callable] = None,
     causal_diag: Optional[Callable] = None,
+    skip_prefix_chunks: bool = True,
 ) -> torch.Tensor:
     """Causal attention with a degree-2 polynomial feature map.
 
@@ -120,6 +121,16 @@ def poly_linear_attention(
         else torch.ones(chunk, chunk, device=dev, dtype=torch.bool).triu(1)
     )
 
+    # Chunks that lie entirely inside the exact prefix have their output
+    # overwritten by the SDPA call at the end, so computing it is pure waste --
+    # 8 of 196 chunks at exact_prefix=4096, C=512. The STATE UPDATE still runs:
+    # every later chunk depends on it.
+    # skip_prefix_chunks=False restores the pre-optimization behaviour so it
+    # can run as a second arm in the same benchmarking session.
+    prefix_end = (
+        min(exact_prefix, N) if exact_prefix > 0 and skip_prefix_chunks else 0
+    )
+
     for t0 in range(0, N, chunk):
         t1 = min(t0 + chunk, N)
         C = t1 - t0
@@ -127,53 +138,55 @@ def poly_linear_attention(
         b = (k[:, :, t0:t1] * rs).reshape(M, C, D)
         vc = v[:, :, t0:t1].reshape(M, C, D)
 
-        if t0 == 0:
-            num = torch.zeros(M, C, D, device=dev, dtype=state_dtype)
-            den = torch.zeros(M, C, 1, device=dev, dtype=state_dtype)
-        else:
-            af = a.to(cdt)
-            num = (
-                c0 * s_const.expand(M, C, D)
-                + c1 * (af @ s_lin.to(cdt)).to(state_dtype)
-            )
-            den = (
-                c0 * z_const.expand(M, C, 1)
-                + c1 * (af @ z_lin.to(cdt)).to(state_dtype)
-            )
-            den = den + c2 * (
-                (af @ gram.to(cdt)) * af
-            ).sum(-1, keepdim=True).to(state_dtype)
-            if quad_apply is None:
-                aq = phi2(af)
-                num = num + c2 * (aq @ s_quad.to(cdt)).to(state_dtype)
-                del aq
+        def emit_chunk():
+            """Numerator, denominator and output store for this chunk."""
+            if t0 == 0:
+                num = torch.zeros(M, C, D, device=dev, dtype=state_dtype)
+                den = torch.zeros(M, C, 1, device=dev, dtype=state_dtype)
             else:
-                num = num + c2 * quad_apply(af, s_quad).to(state_dtype)
+                af = a.to(cdt)
+                num = (
+                    c0 * s_const.expand(M, C, D)
+                    + c1 * (af @ s_lin.to(cdt)).to(state_dtype)
+                )
+                den = (
+                    c0 * z_const.expand(M, C, 1)
+                    + c1 * (af @ z_lin.to(cdt)).to(state_dtype)
+                )
+                den = den + c2 * (
+                    (af @ gram.to(cdt)) * af
+                ).sum(-1, keepdim=True).to(state_dtype)
+                if quad_apply is None:
+                    aq = phi2(af)
+                    num = num + c2 * (aq @ s_quad.to(cdt)).to(state_dtype)
+                    del aq
+                else:
+                    num = num + c2 * quad_apply(af, s_quad).to(state_dtype)
 
-        # Exact diagonal block. No max subtraction: scores are measured bounded
-        # to [-2.203, 2.404], so exp cannot overflow. The guard keeps that true.
-        #
-        # Kept in the compute dtype end to end. Upcasting to float32 here forced
-        # the PV product onto an fp32 SGEMM, off the tensor cores, and tripled
-        # the traffic of the [M, C, C] block through exp, the mask and the row
-        # sum. Profiled at 195 ms of 547 -- more than both Triton kernels
-        # combined -- and worth 1.71x on its own at N=100000, B=2. Only the row
-        # sum accumulates in float32, where ~512 terms of order 1 would
-        # otherwise lose bits.
-        if causal_diag is None:
-            blocked = blocked_full if C == chunk else blocked_full[:C, :C]
-            w = torch.exp(a @ b.transpose(-2, -1)).masked_fill_(blocked, 0.0)
-            d_num = w @ vc
-            d_den = w.sum(-1, keepdim=True, dtype=torch.float32)
-            del w
-        else:
-            d_num, d_den = causal_diag(a, b, vc)
-        num = num + d_num.to(state_dtype)
-        den = den + d_den.to(state_dtype)
-        del d_num, d_den
+            # Exact diagonal block. No max subtraction: scores are measured
+            # bounded to [-2.203, 2.404], so exp cannot overflow. The guard
+            # keeps that true.
+            #
+            # Kept in the compute dtype end to end. Upcasting to float32 here
+            # forced the PV product onto an fp32 SGEMM, off the tensor cores,
+            # and tripled the traffic of the [M, C, C] block through exp, the
+            # mask and the row sum. Only the row sum accumulates in float32,
+            # where ~512 terms of order 1 would otherwise lose bits.
+            if causal_diag is None:
+                blocked = blocked_full if C == chunk else blocked_full[:C, :C]
+                w = torch.exp(a @ b.transpose(-2, -1)).masked_fill_(blocked, 0.0)
+                d_num = w @ vc
+                d_den = w.sum(-1, keepdim=True, dtype=torch.float32)
+                del w
+            else:
+                d_num, d_den = causal_diag(a, b, vc)
+            num = num + d_num.to(state_dtype)
+            den = den + d_den.to(state_dtype)
 
-        out[:, :, t0:t1] = (num / den).to(q.dtype).reshape(B, H, C, D)
-        del num, den
+            out[:, :, t0:t1] = (num / den).to(q.dtype).reshape(B, H, C, D)
+
+        if t1 > prefix_end:
+            emit_chunk()
 
         bf = b.to(cdt)
         vfc = vc.to(cdt)

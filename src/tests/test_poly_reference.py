@@ -133,5 +133,41 @@ class PolyReferenceTests(unittest.TestCase):
         self.assertLess((base - hooked).abs().max().item(), 1e-5)
 
 
+    def test_chunks_inside_the_exact_prefix_are_not_computed(self):
+        """Their output is overwritten by SDPA, so computing it is pure waste."""
+        from src.implementations.poly_reference import poly_linear_attention
+
+        q, k, v, scale = self._qkv(N=1024)
+        calls = []
+
+        def counting_diag(a, b, vc):
+            calls.append(a.shape[1])
+            return self._dense_diag(a, b, vc)
+
+        poly_linear_attention(
+            q, k, v, scale, chunk=256, exact_prefix=512, sigma=0.334,
+            causal_diag=counting_diag, **self.CPU_KW,
+        )
+        # 1024/256 = 4 chunks; the first two lie entirely inside the prefix.
+        self.assertEqual(len(calls), 2)
+
+    def test_prefix_skipping_does_not_change_the_output(self):
+        """The skipped region is overwritten, so the answer must be identical."""
+        import torch.nn.functional as F
+
+        from src.implementations.poly_reference import poly_linear_attention
+
+        q, k, v, scale = self._qkv(N=1024)
+        kw = dict(chunk=256, sigma=0.334, **self.CPU_KW)
+        skipped = poly_linear_attention(q, k, v, scale, exact_prefix=512, **kw)
+        # exact_prefix=0 then an explicit SDPA overwrite reproduces the old
+        # behaviour: everything computed, the prefix then thrown away.
+        full = poly_linear_attention(q, k, v, scale, exact_prefix=0, **kw)
+        full[:, :, :512] = F.scaled_dot_product_attention(
+            q[:, :, :512], k[:, :, :512], v[:, :, :512], is_causal=True, scale=scale
+        )
+        self.assertLess((skipped - full).abs().max().item(), 1e-5)
+
+
 if __name__ == "__main__":
     unittest.main()
