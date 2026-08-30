@@ -10,7 +10,10 @@ libraries and literature, and how much of it can we reuse?
 ## Summary
 
 **The algorithm we validated is already implemented, in production quality, by
-`fla-org/flash-linear-attention` — and it refuses our head dimension.** Every
+`fla-org/flash-linear-attention` — and it refuses our head dimension. The one
+published technique that would remove the obstacle, PolySketchFormer's
+sketching, was retrieved and measured, and is strictly worse than exact at our
+score scale (section 3.2).** Every
 published implementation of second-order Taylor linear attention assumes a head
 dimension of 16, by design, because the second-order state is `O(d^2 * d)` and
 `d = 16` is the largest value that keeps that state in registers. Our case-14
@@ -105,23 +108,69 @@ remainder as headroom, not as a forecast.
   capacity are the binding constraints, and autotuning beats manual tuning for
   portability. Directly relevant given we must pick a feature-block size.
 
-### 3.2 Attacks our exact bottleneck, but unverified
+### 3.2 Attacks our exact bottleneck, and is measurably wrong for us
 
-- **PolySketchFormer (Kacham et al., ICML 2024)** — sketches the polynomial
-  kernel's tensor-product feature map down to a smaller dimension using
-  techniques from randomised numerical linear algebra, with approximation
-  guarantees, reporting 2.5-4x over FlashAttention at 32k context with no quality
-  degradation. If feature-dimension tiling underperforms, sketching `d^2 = 4096`
-  to a few hundred dimensions is the obvious fallback, and our error budget is
-  unusually forgiving: the quadratic term carries only a small part of the
-  attention output, so a sketch with substantial relative error on *that term*
-  may still land inside tolerance.
+- **PolySketchFormer (Kacham et al., ICML 2024)** — sketches the tensor-product
+  feature map so the `h^2` outer product is never built. **Retrieved,
+  implemented, measured, and rejected.**
 
-  **Caveat: the sketch construction, the guarantee's dependence on sketch size,
-  and the sketch dimensions used experimentally could not be retrieved.** The
-  OpenReview page returned a verification interstitial and the arXiv PDF did not
-  extract. Only the abstract-level claims above are sourced. Do not build on this
-  until the construction is read from the paper.
+  The degree-2 construction (recursive sketch of Ahle et al., 2020) is
+
+  ```text
+  A^(x)2 S = sqrt(1/r) * [ (A G1) . (A G2) ]
+  ```
+
+  with independent Gaussians `G1, G2` in `R^{h x r}` and `.` the Hadamard
+  product. Two skinny projections and an elementwise multiply, giving `r`
+  features instead of `h^2`. Theorem 1.1 gives, for `r = Theta(p eps^-2 log 1/d)`,
+
+  ```text
+  sum_ij | <phi'(q_i), phi'(k_j)> - <q_i,k_j>^p |^2
+        <= eps^2 * sum_ij ||q_i||^{2p} ||k_j||^{2p}
+  ```
+
+  Their experiments use `h = 64` — our exact head dimension — with `r` in
+  {32, 64}, reporting 2x over FlashAttention at 32k context.
+
+  **It does not work at our score scale, and the reason is in the guarantee.**
+  The error is bounded relative to `||q||^{2p} ||k||^{2p}`, not relative to the
+  signal `(q.k)^p`. For near-orthogonal `q, k` in `h` dimensions —
+  which is exactly our case, `sigma = 0.334` — the signal is about `h` times
+  smaller than that normalisation, so the *relative* error is inflated by `~h`.
+
+  Measured, unit-norm random vectors, relative rms error on the `s^2` term:
+
+  | | r=16 | r=32 | r=64 | r=128 | r=256 | r=512 |
+  | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+  | rel. error at h=64 | 10.28 | 6.95 | **4.87** | 3.42 | 2.39 | 1.72 |
+
+  At the paper's own `r = 64` the sketched `s^2` carries **487% relative error**
+  and takes values as low as `-13.1`, despite `s^2 >= 0` — so it also breaks the
+  non-negativity the paper is careful to preserve.
+
+  Both scalings were confirmed rather than assumed. At fixed `r = 64` the
+  relative error is linear in `h` (1.02, 1.39, 2.59, 4.95, 9.46 for
+  h = 8, 16, 32, 64, 128; `rel/h` converging to ~0.077), and at fixed `h` it
+  falls as `1/sqrt(r)` (predicted against measured within 6%). Together:
+  `rel_err ~= 0.62 * h / sqrt(r)`.
+
+  **The decisive number.** Our budget tolerates roughly 30% error on the
+  quadratic term — order 1, which discards that term entirely, fails the
+  criterion by only 15-957 elements. Reaching 30% at `h = 64` needs
+
+  ```text
+  r ~= (0.62 * 64 / 0.30)^2 ~= 17,000 features
+  ```
+
+  against **4,096** for the exact outer product. **Sketching needs ~4x more
+  features than computing the term exactly.** It is strictly worse here, and no
+  choice of `r` fixes that.
+
+  This is the same root cause as every other rejection in this stream: the
+  methods assume peaked, high-magnitude attention scores, and ours are tiny and
+  near-uniform. It is worth stating that the paper is not wrong — trained models
+  have far larger scores, where the normalisation is tight and the sketch is
+  excellent.
 
 ### 3.3 Considered and not applicable
 
@@ -145,8 +194,10 @@ remainder as headroom, not as a forecast.
 4. **Keep the `sigma`-fitted constant.** FLA's Based uses the plain Taylor
    constant; our measured Gauss-Hermite constant was 2.3x more accurate at no
    cost, and is what makes order 2 pass where order 1 fails.
-5. **Sketching is the fallback, not the plan**, until section 3.2's caveat is
-   resolved.
+5. **Sketching is closed, not a fallback.** Section 3.2 measured it needing ~4x
+   more features than the exact outer product at our score scale. Feature-
+   dimension tiling is therefore the only route, which raises the stakes on
+   decision 2.
 
 ## 5. Sources
 
@@ -193,10 +244,14 @@ remainder as headroom, not as a forecast.
   Sketching techniques from randomised numerical linear algebra give linear-time
   polynomial attention with approximation guarantees; reports 2.5-4x training
   speedup over FlashAttention at 32k context with no observed quality
-  degradation. **Only abstract-level claims are sourced** — the sketch
-  construction, guarantee, and experimental sketch dimensions could not be
-  retrieved (OpenReview interstitial; PDF did not extract) and must be read
-  before use.
+  degradation. Construction and Theorem 1.1 retrieved 30 August 2026 from the
+  ar5iv rendering <https://ar5iv.labs.arxiv.org/html/2310.01655>; the OpenReview
+  page serves a verification interstitial and the PDFs use CID fonts that do not
+  extract. Degree-2 sketch is `sqrt(1/r)[(A G1) . (A G2)]` over independent
+  Gaussians, per the recursive construction of Ahle et al. (2020). Causal
+  masking uses a block algorithm, `P_l = lt(A_l B_l^T) C_l` plus `a_i^T Z_l`
+  with prefix sums `Z_l = sum_{j<l} H_j` — structurally the same chunked scan we
+  already use. **Measured and rejected for this task**; see section 3.2.
 
 - **`HazyResearch/ThunderKittens`.**
   <https://github.com/HazyResearch/ThunderKittens>. Accessed 30 August 2026.
