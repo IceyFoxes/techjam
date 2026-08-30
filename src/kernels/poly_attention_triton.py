@@ -90,6 +90,70 @@ if HAS_TRITON:
             mask=mask_c[:, None] & mask_v[None, :],
         )
 
+    @triton.autotune(
+        configs=[
+            triton.Config({"BC": bc, "BI": bi}, num_warps=w, num_stages=2)
+            for bc in (32, 64)
+            for bi in (1, 2)
+            for w in (4, 8)
+        ],
+        key=["C", "D", "V"],
+        # This kernel accumulates into o_ptr in place, and the autotuner runs
+        # each candidate config several times to time it. Without restore_value
+        # every tuning trial folds the chunk in again, so the state comes out
+        # multiplied by the trial count -- and only on the first call for a
+        # given key, since later calls hit the config cache and run once. That
+        # makes it a shape-dependent, cache-order-dependent wrong answer.
+        restore_value=["o_ptr"],
+    )
+    @triton.jit
+    def _quad_update_kernel(
+        b_ptr, v_ptr, o_ptr,
+        stride_bm, stride_bc, stride_bd,
+        stride_vm, stride_vc, stride_vv,
+        stride_om, stride_of, stride_ov,
+        C, D: tl.constexpr, V: tl.constexpr,
+        BC: tl.constexpr, BI: tl.constexpr, BV: tl.constexpr,
+    ):
+        pid_i = tl.program_id(0)
+        pid_m = tl.program_id(1)
+
+        i0 = pid_i * BI
+        offs_d = tl.arange(0, D)
+        offs_i = i0 + tl.arange(0, BI)
+        offs_v = tl.arange(0, BV)
+        mask_v = offs_v < V
+
+        b_base = b_ptr + pid_m * stride_bm
+        v_base = v_ptr + pid_m * stride_vm
+        acc = tl.zeros((BI * D, BV), dtype=tl.float32)
+
+        for c0 in range(0, C, BC):
+            offs_c = c0 + tl.arange(0, BC)
+            mask_c = offs_c < C
+            b = tl.load(
+                b_base + offs_c[:, None] * stride_bc + offs_d[None, :] * stride_bd,
+                mask=mask_c[:, None], other=0.0,
+            )
+            bi = tl.load(
+                b_base + offs_c[:, None] * stride_bc + offs_i[None, :] * stride_bd,
+                mask=mask_c[:, None], other=0.0,
+            )
+            phi = _phi_tile(b, bi, BC, BI, D)
+            vt = tl.load(
+                v_base + offs_c[:, None] * stride_vc + offs_v[None, :] * stride_vv,
+                mask=mask_c[:, None] & mask_v[None, :], other=0.0,
+            )
+            acc += tl.dot(tl.trans(phi).to(tl.float16), vt.to(tl.float16))
+
+        offs_f = i0 * D + tl.arange(0, BI * D)
+        o_addr = (
+            o_ptr + pid_m * stride_om
+            + offs_f[:, None] * stride_of + offs_v[None, :] * stride_ov
+        )
+        prev = tl.load(o_addr, mask=mask_v[None, :], other=0.0)
+        tl.store(o_addr, prev + acc, mask=mask_v[None, :])
+
 
 def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
     """``phi2(a) @ s`` without materialising ``phi2(a)``.
@@ -118,3 +182,34 @@ def quad_apply(a: torch.Tensor, s: torch.Tensor) -> torch.Tensor:
         C, D, V, BV=BV,
     )
     return y
+
+
+def quad_update(b: torch.Tensor, v: torch.Tensor, out: torch.Tensor) -> None:
+    """Accumulate ``phi2(b)^T @ v`` into ``out`` in place.
+
+    ``b`` is ``[M, C, D]`` float16, ``v`` is ``[M, C, V]`` float16, and ``out``
+    is ``[M, D*D, V]`` float32. ``out`` is the running state, so this adds
+    rather than overwrites.
+    """
+    if not HAS_TRITON:
+        raise RuntimeError("Triton is not available")
+    M, C, D = b.shape
+    V = v.shape[2]
+    if out.shape != (M, D * D, V):
+        raise ValueError(f"out shape {tuple(out.shape)} != {(M, D * D, V)}")
+    if out.dtype != torch.float32:
+        # Not a style preference. A float16 accumulator passes at N=16384 and
+        # fails at N=65536 with over a million failures, so it must fail loudly
+        # here rather than compute something plausible.
+        raise ValueError("the master state must be float32; see the module docstring")
+    b = b.contiguous()
+    v = v.contiguous()
+    BV = max(16, triton.next_power_of_2(V))
+    grid = lambda meta: (triton.cdiv(D, meta["BI"]), M)  # noqa: E731
+    _quad_update_kernel[grid](
+        b, v, out,
+        b.stride(0), b.stride(1), b.stride(2),
+        v.stride(0), v.stride(1), v.stride(2),
+        out.stride(0), out.stride(1), out.stride(2),
+        C, D, V, BV=BV,
+    )
