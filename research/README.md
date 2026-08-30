@@ -8,7 +8,9 @@
   that this region is memory-bound; and the measured decision to target float32
   with `scaled_dot_product_attention`. Includes the finding that float16 fails the
   precision criterion for any arithmetic reassociation, which constrains all four
-  streams.
+  streams. Also includes `long-sequence-attention.md`, which re-tests the
+  approximate-attention literature at case 14's `N=100000` and validates a
+  polynomial feature-map linear attention there.
 - [Framework fast paths and dispatcher](framework-fastpaths/README.md): Person 1
   research on `torch.compile` modes, CUDA Graph suitability, numerical limits,
   RTX 5080 measurements, and a full-tuple routing matrix for integrating the
