@@ -67,6 +67,7 @@ MIN_COMPILED_CUDA_CAPABILITY = (8, 0)
 VALIDATED_TORCH_VERSION = "2.13.0+cu130"
 VALIDATED_MATMUL_PRECISION = "high"
 VALIDATED_ALLOW_TF32 = True
+PACKED_QKV_CASES = frozenset((2, 3))
 
 
 def _config_key(config: TransformerConfig) -> ConfigKey:
@@ -270,7 +271,7 @@ class DispatchingTransformer(BaselineTransformer):
         case_id = OFFICIAL_CASE_BY_CONFIG.get(_config_key(config))
         if _config_key(config) == CASE_14_CONFIG:
             attention_type = FlashOnlySDPASelfAttention
-        elif case_id == 2:
+        elif case_id in PACKED_QKV_CASES:
             attention_type = PackedQKVSDPASelfAttention
         else:
             attention_type = StridedSDPASelfAttention
@@ -694,7 +695,7 @@ CANDIDATE = CandidateSpec(
     model_factory=DispatchingTransformer,
     owner="Person 1 / integrator",
     description=(
-        "Fourteen-case CUDA dispatcher: Case-2 packed QKV, compiled strided "
+        "Fourteen-case CUDA dispatcher: Cases 2/3 packed QKV, compiled strided "
         "SDPA, and memory-safe streamed routes for Cases 6 and 14."
     ),
     self_compiling=True,
