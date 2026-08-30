@@ -110,7 +110,23 @@ class CandidateContractTests(unittest.TestCase):
             torch_version="2.13.0+cu130",
         )
 
-    def test_benchmark_rejects_unsafe_extreme_dtype_before_allocation(self) -> None:
+    def test_benchmark_accepts_case14_fp32_for_streamed_oracle(self) -> None:
+        from src.infra import validate_candidate_execution
+
+        candidate = load_candidate("src.dispatcher")
+        validate_candidate_execution(
+            candidate,
+            official_case_id=14,
+            compile_user=False,
+            dtype_name="float32",
+            candidate_only=True,
+            input_scale=1.0,
+            device_type="cuda",
+            cuda_capability=(12, 0),
+            torch_version="2.13.0+cu130",
+        )
+
+    def test_benchmark_rejects_case14_bfloat16_before_allocation(self) -> None:
         from src.infra import validate_candidate_execution
 
         candidate = load_candidate("src.dispatcher")
@@ -119,7 +135,8 @@ class CandidateContractTests(unittest.TestCase):
                 candidate,
                 official_case_id=14,
                 compile_user=False,
-                dtype_name="float32",
+                dtype_name="bfloat16",
+                candidate_only=True,
             )
 
     def test_regular_benchmark_rejects_case14_unsafe_baseline(self) -> None:
