@@ -205,8 +205,42 @@ is made **outside** the captured region:
   2.13.0+cu130, where the same comparison is 51.2 ms vs 48.8 ms. Do not plan
   against it.
 
-#### Still open
+#### Resolved: the gain grows under compilation
 
-Whether the ~5% eager gain survives `reduce-overhead`. Compilation may already
-hide the mask cost. This host now runs the pinned stack and passes the
-dispatcher gates, so the A/B is finally measurable here.
+Measured 30 August 2026 on the pinned cu130 stack, A/B of `src.dispatcher`
+against itself with only `drop_key_mask` differing, both sides fully compiled:
+
+| Case | drop / keep | floor | significant |
+| ---: | ---: | ---: | --- |
+| 13 | **1.153x / 1.155x** | ±0.34-0.52% | yes |
+| 1 | **1.123x / 1.112x** | ±0.76-0.78% | yes |
+| 11 | **1.095x** (both pr) | ±0.61-0.71% | yes |
+| 12 | **1.036x** | ±0.71% | yes |
+| 2 | 1.037x / 1.049x | ±5.0-6.3% | no |
+| 3 | 1.022x | ±4.47% | no |
+
+Six significant and positive, four positive but inside their floors, none
+negative. Eager was ~2-5% on the large shapes; compiled it is 9.5-15.5%, so the
+optimization is worth **more** in the shipped configuration than the standalone
+candidate suggested. Records:
+[`../benchmarks/2026-08-30-rtx4060-85cfd8d/`](../benchmarks/2026-08-30-rtx4060-85cfd8d/README.md).
+
+#### Implemented, 30 August 2026
+
+The change is applied rather than only proposed. `sdpa.py` gained
+`drop_key_mask = False` (class-level, so behavior is unchanged unless enabled)
+and `dispatcher.py` gained `_may_drop_key_mask`, which enables it only after
+verifying **both** that the config is causal and that the mask is prefix-valid.
+It refuses on the reference route, on `causal=False`, on a general mask, and
+when no mask is present; `src/tests/test_dispatcher_key_mask.py` covers each.
+
+**The check runs once per runtime key, never per forward.** Measured, the host
+sync costs **85-99 us** — far more than the 10-20 us first assumed. Against case
+2's compiled forward (~0.2-0.4 ms) a per-call check would have consumed the gain
+several times over. It therefore runs on a cache miss beside compilation, and a
+test pins that it does not scale with call count.
+
+The residual assumption is that mask structure is stable for a given runtime
+key. That holds for the official harness, whose `generate_random_case` provably
+emits right-padded masks (pinned by `src/tests/test_padding_mask_redundancy.py`),
+and the dispatcher already gates on a static contract of comparable strength.

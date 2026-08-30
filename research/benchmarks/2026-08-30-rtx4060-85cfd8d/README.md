@@ -151,3 +151,60 @@ An earlier exploratory run of the same shape on the legacy torch 2.6.0+cu124
 stack reported 2.032x, also under oversubscription and therefore equally
 unusable. It is mentioned only so the discrepancy is not mistaken for a
 regression.
+
+## Compiled A/B — does the gain survive `reduce-overhead`?
+
+The sweep above measures the **eager** candidate. The open question it left was
+whether dropping the key mask still helps once `torch.compile` has run, since
+compilation might already hide the mask cost. It does not: the gain is *larger*
+compiled than eager.
+
+In-process A/B of `src.dispatcher` against itself, identical in every respect
+except `drop_key_mask`. Both sides fully compiled through the routed path
+(`reduce-overhead` for cases 1-12, `default` for 13), same process, interleaved.
+
+| Case | pr | keep mask | drop mask | drop / keep | floor | significant |
+| ---: | --- | ---: | ---: | ---: | ---: | --- |
+| 13 | 0.0 | 51.105 ms | 44.317 ms | **1.153x** | ±0.34% | yes |
+| 13 | 0.3 | 51.288 ms | 44.398 ms | **1.155x** | ±0.52% | yes |
+| 1 | 0.0 | 1.669 ms | 1.486 ms | **1.123x** | ±0.78% | yes |
+| 1 | 0.3 | 1.652 ms | 1.486 ms | **1.112x** | ±0.76% | yes |
+| 11 | 0.0 | 3.930 ms | 3.590 ms | **1.095x** | ±0.61% | yes |
+| 11 | 0.3 | 3.752 ms | 3.427 ms | **1.095x** | ±0.71% | yes |
+| 12 | 0.0 | 0.480 ms | 0.464 ms | **1.036x** | ±0.71% | yes |
+| 2 | 0.0 | 0.374 ms | 0.361 ms | 1.037x | ±4.99% | no |
+| 2 | 0.3 | 0.343 ms | 0.327 ms | 1.049x | ±6.30% | no |
+| 3 | 0.0 | 0.266 ms | 0.260 ms | 1.022x | ±4.47% | no |
+
+Cases 2, 3 and 12 were measured at 250 repeats with a 25 s settle; the rest at
+60 repeats with 15 s.
+
+**Six comparisons are significant and positive; four are positive but inside
+their floors. None is negative.** The launch-bound shapes (2, 3, 12) run in
+0.26-0.48 ms compiled, where attention is a small share of a forward dominated
+by kernel-launch overhead, so a small effect there is expected and mostly
+unresolvable.
+
+An earlier 60-repeat run put case 2 at **0.941x** at `padding_ratio=0`, which
+would have read as a regression. At 250 repeats the same comparison is 1.037x,
+and the pr=0.3 direction agreed all along. Its floor was ±14.9%, so the figure
+never supported a conclusion. Same lesson as the eager sweep: **sub-millisecond
+cases need hundreds of repeats.**
+
+### Why compiled beats eager
+
+The eager gain was ~2-5% on large shapes; compiled it is 9.5-15.5%. Inductor
+removes surrounding overhead that partly masked the difference eagerly, so the
+mask's cost becomes a larger share of what remains. The practical consequence is
+that this optimization is worth *more* in the shipped configuration than the
+standalone candidate measurement suggested.
+
+### Reproduce
+
+```bash
+.venv/bin/python <scratch>/disp_ab.py --case 13 --pr 0.3 --repeats 60 --settle 15
+```
+
+The A/B harness subclasses `DispatchingTransformer` and overrides
+`_may_drop_key_mask` to force each side, so both paths compile identically and
+differ only in the masking decision.
