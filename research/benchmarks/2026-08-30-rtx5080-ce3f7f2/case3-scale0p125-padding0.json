@@ -1,0 +1,316 @@
+{
+  "accuracy": {
+    "atol": 0.002,
+    "failed_elements": 0,
+    "max_abs_error": 0.002368137240409851,
+    "max_relative_error": 822.448486328125,
+    "passed": true,
+    "rtol": 0.02,
+    "total_elements": 655360,
+    "trials": [
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0019309520721435547,
+        "max_relative_error": 148.00344848632812,
+        "mean_abs_error": 0.0002878087980207056,
+        "optimized_at_worst": 1.500638723373413,
+        "passed": true,
+        "reference_at_worst": 1.4987077713012695,
+        "seed": 1234,
+        "total_elements": 65536,
+        "trial": 1,
+        "worst_index": [
+          1,
+          3,
+          105
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0017207860946655273,
+        "max_relative_error": 12.630871772766113,
+        "mean_abs_error": 0.00027145142666995525,
+        "optimized_at_worst": -1.1478136777877808,
+        "passed": true,
+        "reference_at_worst": -1.1460928916931152,
+        "seed": 1235,
+        "total_elements": 65536,
+        "trial": 2,
+        "worst_index": [
+          2,
+          8,
+          36
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.001973450183868408,
+        "max_relative_error": 23.65740966796875,
+        "mean_abs_error": 0.0002852948964573443,
+        "optimized_at_worst": -0.9371399879455566,
+        "passed": true,
+        "reference_at_worst": -0.9351665377616882,
+        "seed": 1236,
+        "total_elements": 65536,
+        "trial": 3,
+        "worst_index": [
+          1,
+          10,
+          10
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0019290447235107422,
+        "max_relative_error": 34.445167541503906,
+        "mean_abs_error": 0.00028130848659202456,
+        "optimized_at_worst": 0.6635124087333679,
+        "passed": true,
+        "reference_at_worst": 0.6654414534568787,
+        "seed": 1237,
+        "total_elements": 65536,
+        "trial": 4,
+        "worst_index": [
+          2,
+          4,
+          73
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0018567442893981934,
+        "max_relative_error": 28.61017417907715,
+        "mean_abs_error": 0.0002775683824438602,
+        "optimized_at_worst": -0.386355459690094,
+        "passed": true,
+        "reference_at_worst": -0.3844987154006958,
+        "seed": 1238,
+        "total_elements": 65536,
+        "trial": 5,
+        "worst_index": [
+          1,
+          13,
+          113
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0019408464431762695,
+        "max_relative_error": 822.448486328125,
+        "mean_abs_error": 0.00027739524375647306,
+        "optimized_at_worst": -0.37578916549682617,
+        "passed": true,
+        "reference_at_worst": -0.3738483190536499,
+        "seed": 1239,
+        "total_elements": 65536,
+        "trial": 6,
+        "worst_index": [
+          2,
+          4,
+          120
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.001850724220275879,
+        "max_relative_error": 502.50244140625,
+        "mean_abs_error": 0.000269112380919978,
+        "optimized_at_worst": 0.5600478053092957,
+        "passed": true,
+        "reference_at_worst": 0.5618985295295715,
+        "seed": 1240,
+        "total_elements": 65536,
+        "trial": 7,
+        "worst_index": [
+          0,
+          6,
+          94
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0021424293518066406,
+        "max_relative_error": 71.19892883300781,
+        "mean_abs_error": 0.00028558383928611875,
+        "optimized_at_worst": -0.9574840664863586,
+        "passed": true,
+        "reference_at_worst": -0.955341637134552,
+        "seed": 1241,
+        "total_elements": 65536,
+        "trial": 8,
+        "worst_index": [
+          3,
+          24,
+          61
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.002368137240409851,
+        "max_relative_error": 14.3695068359375,
+        "mean_abs_error": 0.0002974080853164196,
+        "optimized_at_worst": -0.15453670918941498,
+        "passed": true,
+        "reference_at_worst": -0.15690484642982483,
+        "seed": 1242,
+        "total_elements": 65536,
+        "trial": 9,
+        "worst_index": [
+          3,
+          18,
+          91
+        ]
+      },
+      {
+        "failed_elements": 0,
+        "failed_feature_dims": [],
+        "max_abs_error": 0.0016613602638244629,
+        "max_relative_error": 5.53195333480835,
+        "mean_abs_error": 0.00027882313588634133,
+        "optimized_at_worst": 0.38034602999687195,
+        "passed": true,
+        "reference_at_worst": 0.3820073902606964,
+        "seed": 1243,
+        "total_elements": 65536,
+        "trial": 10,
+        "worst_index": [
+          3,
+          1,
+          43
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "candidate_only_official_cases": [
+      14
+    ],
+    "default_input_scale_only_cases": [
+      14
+    ],
+    "description": "Fourteen-case CUDA dispatcher: Cases 2/3 packed QKV, compiled strided SDPA, and memory-safe streamed routes for Cases 6 and 14.",
+    "name": "dispatcher",
+    "official_case_dtypes": {
+      "6": [
+        "float32"
+      ],
+      "14": [
+        "float16"
+      ]
+    },
+    "owner": "Person 1 / integrator",
+    "selector": "src.dispatcher",
+    "self_compiling": true,
+    "strict_weight_copy": true,
+    "unsupported_official_cases": []
+  },
+  "command": "/home/kevin/techjam/.venv/bin/python /tmp/techjam-pr15-update/src/benchmark.py --candidate src.dispatcher --case 3 --device cuda --dtype float32 --accuracy-trials 10 --seed 1234 --input-scale 0.125 --padding-ratio 0 --repeats 2 --settle-seconds 0 --sample-target-ms 1 --output /home/kevin/techjam/research/benchmarks/2026-08-30-rtx5080-ce3f7f2/case3-scale0p125-padding0.json",
+  "config": {
+    "batch_size": 4,
+    "causal": true,
+    "d_model": 128,
+    "ffn_dim": 128,
+    "num_heads": 4,
+    "num_layers": 4,
+    "seq_len": 128
+  },
+  "device": "cuda",
+  "dtype": "float32",
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 665727119360,
+      "path": "/tmp/techjam-pr15-update",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "ce3f7f2c426211f552baf47c84cac21a6be74708",
+    "dirty": false,
+    "status": ""
+  },
+  "input_scale": 0.125,
+  "nvtx_enabled": false,
+  "official_case_id": 3,
+  "official_case_source": "task_shapes.png",
+  "padding_ratio": 0.0,
+  "performance": {
+    "baseline": {
+      "mean_ms": 2.9495359659194946,
+      "median_ms": 2.9495359659194946,
+      "min_ms": 2.803679943084717,
+      "p90_ms": 3.066220784187317,
+      "samples_ms": [
+        3.0953919887542725,
+        2.803679943084717
+      ],
+      "tokens_per_second": 173586.62715624424
+    },
+    "block_size": 1,
+    "candidate": {
+      "mean_ms": 0.12491199746727943,
+      "median_ms": 0.12491199746727943,
+      "min_ms": 0.12435200065374374,
+      "p90_ms": 0.12535999491810798,
+      "samples_ms": [
+        0.12547199428081512,
+        0.12435200065374374
+      ],
+      "tokens_per_second": 4098885.698582459
+    },
+    "gpu_state": {
+      "clocks.mem": "15001",
+      "clocks.sm": "2655",
+      "clocks_throttle_reasons.active": "0x0000000000000400",
+      "power.draw": "50.52",
+      "power.limit": "360.00",
+      "temperature.gpu": "43"
+    },
+    "memory": {
+      "baseline": {
+        "before_allocated_bytes": 37800448,
+        "before_reserved_bytes": 79691776,
+        "incremental_peak_allocated_bytes": 4211712,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 42012160,
+        "peak_reserved_bytes": 79691776
+      },
+      "candidate": {
+        "before_allocated_bytes": 37800448,
+        "before_reserved_bytes": 79691776,
+        "incremental_peak_allocated_bytes": 33816576,
+        "incremental_peak_reserved_bytes": 0,
+        "peak_allocated_bytes": 71617024,
+        "peak_reserved_bytes": 79691776
+      }
+    },
+    "noise_floor_ratio": 2.6083558810468563,
+    "repeats": 2,
+    "settle_seconds": 0.0,
+    "significant": true,
+    "speedup": 23.612911695628938,
+    "timing_method": "torch.cuda.Event",
+    "timing_mode": "paired"
+  },
+  "schema_version": 1,
+  "seed": 1234,
+  "timestamp_utc": "2026-08-30T04:12:46.274222+00:00"
+}

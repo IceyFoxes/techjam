@@ -5,6 +5,11 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx5080-ce3f7f2/`](2026-08-30-rtx5080-ce3f7f2/README.md):
+  PR #15 three-reference validation after integrating current `master`. Case 3
+  improves 1.218x over the branch-base dispatcher and passes 60/60 stress
+  trials; Case 2 has no regression. Includes clean immutable and branch-base
+  controls under [`2026-08-30-rtx5080-fecf994/`](2026-08-30-rtx5080-fecf994/README.md).
 - [`2026-08-30-rtx4060-85cfd8d/`](2026-08-30-rtx4060-85cfd8d/README.md): Person 2
   attention mask-route sweep on the pinned cu130 stack. All twelve in-scope
   cases x `padding_ratio` 0.0/0.3 x two routes, 5/5 seeds each with zero failed

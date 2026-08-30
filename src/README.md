@@ -103,8 +103,8 @@ two compiler wrappers:
 On CUDA GPUs with compute capability 8.0 or newer, under the PyTorch
 2.13.0+cu130, float32, high-matmul-precision, TF32-enabled contract, official
 cases 1-5 and 7-12 use strided-view SDPA inside `reduce-overhead`; case 13 uses
-the same SDPA path with ordinary/default compilation. Case 2 additionally packs
-the Q/K/V projections. Performance evidence covers the RTX 4050 and RTX 5080;
+the same SDPA path with ordinary/default compilation. Cases 2 and 3 additionally
+pack the Q/K/V projections. Performance evidence covers the RTX 4050 and RTX 5080;
 other eligible GPUs may produce different speedups. The complete official tuple
 and runtime contract are matched before selecting a route. Non-float32 inputs,
 CPU, older/unknown CUDA capabilities, other software contracts, non-official
@@ -142,10 +142,10 @@ loaded, moved, or converted.
 Case 8 retains the reference projection/FFN layout around SDPA because its
 packed-QKV screen was performance-neutral and failed the integration gate.
 
-The dispatcher uses Person 3's packed-QKV route only for official Case 2. The
+The dispatcher uses Person 3's packed-QKV route for official Cases 2 and 3. The
 standalone `--candidate projections:PACKED_CASE2` selector remains available for
-isolated A/B measurements. Both routes retain the reference Q/K/V parameter
-names and rebuild non-persistent packed buffers outside timed execution. The
+isolated Case-2 A/B measurements. Both dispatcher routes retain the reference
+Q/K/V parameter names and rebuild non-persistent packed buffers outside timed execution. The
 official harness does not mutate parameters after compilation; other callers
 must invoke `refresh_packed_qkv()` on each attention module after out-of-band
 parameter mutation and before compiling or replaying inference.
