@@ -5,6 +5,13 @@ unless promoted to a checkpoint or needed to document a regression.
 
 ## Current Runs
 
+- [`2026-08-30-rtx4060-poly/`](2026-08-30-rtx4060-poly/README.md): Person 2 fused
+  polynomial attention kernel, Phase 1 acceptance. **342.4 ms against 725.7 ms
+  exact flash at N=100000, 2.12x**, and 1.94x over the dense-PyTorch polynomial
+  path. Zero failed elements against the dense reference at N=4096/8192 and
+  against an exact-flash oracle to N=100000 (0 / 102,400,000). Includes the
+  sigma-guard calibration sweep. Attention core only; case 14 cannot run end to
+  end on an 8 GiB card, and the route is an approximation guarded at runtime.
 - [`2026-08-30-rtx4060-85cfd8d/`](2026-08-30-rtx4060-85cfd8d/README.md): Person 2
   attention mask-route sweep on the pinned cu130 stack. All twelve in-scope
   cases x `padding_ratio` 0.0/0.3 x two routes, 5/5 seeds each with zero failed
