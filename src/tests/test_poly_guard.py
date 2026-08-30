@@ -73,6 +73,24 @@ class PolyGuardTests(unittest.TestCase):
 
         self.assertGreater(SIGMA_CEILING, 0.334)
 
+    def test_ceiling_sits_inside_the_measured_safe_band(self):
+        """Pins the Task 7 sweep so a later edit cannot quietly widen it.
+
+        Measured at N=8192 against the dense reference: sigma 0.4808 was the
+        largest value passing the official criterion, and 0.5217 was the first
+        to fail. The ceiling must stay below the last verified pass, so the
+        route never runs in the untested band.
+        """
+        from src.implementations.poly_guard import SIGMA_CEILING, poly_is_safe
+
+        self.assertLessEqual(SIGMA_CEILING, 0.4808)
+        # Everything at or beyond the first observed failure must be rejected.
+        for failing in (0.5217, 0.5642, 0.6544, 0.7512):
+            self.assertFalse(poly_is_safe(failing), f"sigma {failing} must fall back")
+        # The benchmark's own spread across seeds must be comfortably accepted.
+        for operating in (0.3327, 0.3339, 0.3343):
+            self.assertTrue(poly_is_safe(operating), f"sigma {operating} must run")
+
     def test_rejects_wrongly_shaped_inputs(self):
         from src.implementations.poly_guard import estimate_sigma
 

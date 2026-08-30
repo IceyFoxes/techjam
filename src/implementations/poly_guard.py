@@ -19,11 +19,31 @@ from typing import Optional
 import torch
 
 
-# Provisional. Task 7 of the implementation plan replaces this with the measured
-# value from the sigma sweep, set with margin below where the official criterion
-# first fails. Until then it is a guess, and a guessed ceiling is weaker
-# protection than it looks.
-SIGMA_CEILING = 0.60
+# Measured 30 August 2026. Swept by scaling the q_proj/k_proj weights of both
+# the reference and the candidate (``src/validate_poly.py --scale-qk-weights``)
+# and recording where the official criterion first fails, at N=8192 against the
+# dense reference:
+#
+#     sigma 0.3339  0 failures      <- the benchmark's own operating point
+#     sigma 0.4040  0 failures
+#     sigma 0.4808  0 failures      <- largest verified pass
+#     sigma 0.5217  21 failures     <- first observed failure
+#     sigma 0.5642  308 failures
+#     sigma 0.6544  9,566 failures
+#     sigma 0.7512  56,801 failures
+#
+# 0.45 sits 35% above the operating point -- far outside its seed-to-seed spread
+# of 0.3327 to 0.3343, so it cannot cause a spurious fallback -- and below 0.4808,
+# so the route never runs in the untested band between the last pass and the
+# first failure.
+#
+# The provisional value before this sweep was 0.60, which would have permitted
+# sigma values that fail. A guessed ceiling is weaker protection than it looks.
+#
+# Note this is conservative for the target shape: it was measured at N=8192,
+# and attention contributes less to the residual stream as N grows, so the
+# tolerance at N=100000 is more forgiving, not less.
+SIGMA_CEILING = 0.45
 
 
 def estimate_sigma(

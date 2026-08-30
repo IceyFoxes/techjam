@@ -1274,15 +1274,17 @@ The guard is decorative until this runs. Spec section 6 requires a measured ceil
 
 - [ ] **Step 1: Sweep sigma until the criterion fails**
 
-`--scale-qk` multiplies the input, which scales scores quadratically, so sigma rises roughly as the square.
+**Corrected during execution.** The original instruction here used `--scale-qk`, which multiplies the input. That does **not** move sigma: the first operation in every layer is `norm1`, a `LayerNorm`, which is scale-invariant, so Q and K are unchanged. Measured, sigma stayed at 0.3339 for input scales 1.0, 1.5 and 2.0.
+
+Sweep with `--scale-qk-weights` instead, which scales the `q_proj` and `k_proj` weights of **both** models — so they still compute the same function — and therefore scales scores by the square of the factor.
 
 ```bash
-for s in 1.0 1.25 1.5 1.75 2.0 2.5 3.0; do
-  .venv/bin/python -m src.validate_poly --n 8192 --oracle dense --scale-qk $s
+for w in 1.0 1.5 2.0 2.5 3.0; do
+  .venv/bin/python -m src.validate_poly --n 8192 --oracle dense --scale-qk-weights $w
 done
 ```
 
-Record the printed `sigma` and PASS/FAIL for each. Expected: PASS at low sigma, FAIL beyond some point.
+Record the printed `sigma` and PASS/FAIL for each. Expected: PASS at low sigma, FAIL beyond some point. If the first FAIL is at the second point, sweep finer between them before bisecting.
 
 - [ ] **Step 2: Narrow the boundary**
 
@@ -1290,7 +1292,9 @@ Bisect between the last PASS and the first FAIL with three more runs to locate t
 
 - [ ] **Step 3: Set the ceiling with margin**
 
-Edit `src/implementations/poly_guard.py`, replacing the provisional constant. Use **half** the measured failure sigma, and record both numbers:
+**Corrected during execution.** The original rule here was "use half the measured failure sigma". That assumed a wide gap between the operating point and the failure point. Measured, the gap is only 1.56x — sigma 0.334 operating against a first failure at 0.5217 — so half the failure value is 0.26, *below* the operating point, which would disable the route entirely.
+
+The rule that works: set the ceiling **below the largest verified passing sigma**, and comfortably above the operating point's seed-to-seed spread. Record the full sweep, not just the chosen number:
 
 ```python
 # Measured 30 August 2026 by sweeping --scale-qk in src/validate_poly.py at
