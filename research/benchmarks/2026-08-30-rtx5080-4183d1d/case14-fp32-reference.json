@@ -1,0 +1,59 @@
+{
+  "command": "/home/kevin/techjam/.venv/bin/python /home/kevin/techjam/src/case14_fp32_reference.py --device cuda --batch-size 32 --seq-len 100000 --validate-dense-n 4096 --seed 1234 --output research/benchmarks/2026-08-30-rtx5080-4183d1d/case14-fp32-reference.json",
+  "config": {
+    "batch_size": 32,
+    "causal": true,
+    "d_model": 1024,
+    "ffn_dim": 1024,
+    "num_heads": 16,
+    "num_layers": 2,
+    "seq_len": 100000
+  },
+  "dense_validation": {
+    "failed_elements": 0,
+    "max_abs_error": 0.0006024837493896484,
+    "max_relative_error": 107.18661499023438,
+    "mean_abs_error": 4.2655925655693484e-05,
+    "passed": true,
+    "status": "pass",
+    "total_elements": 4194304
+  },
+  "dtype": "float32",
+  "elapsed_seconds": 90.5807716119889,
+  "environment": {
+    "cpu": "x86_64",
+    "disk": {
+      "free_bytes": 661787054080,
+      "path": "/home/kevin/techjam",
+      "total_bytes": 1081101176832
+    },
+    "gpu": {
+      "available": true,
+      "cuda_runtime": "13.0",
+      "driver": "616.56",
+      "name": "NVIDIA GeForce RTX 5080"
+    },
+    "os": "Linux-6.6.114.1-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "pytorch": "2.13.0+cu130"
+  },
+  "git": {
+    "commit": "4183d1d510f131d3230a6f078b267b3afbef7cd9",
+    "dirty": true,
+    "status": "?? research/benchmarks/2026-08-29-rtx5080-1234/\n?? research/benchmarks/2026-08-29-rtx5080-12345/\n?? research/benchmarks/2026-08-30-rtx5080-fecf994/base-dispatcher-case3.json\n?? research/benchmarks/2026-08-30-rtx5080-fecf994/baseline-case3.json\n?? research/benchmarks/2026-08-30-rtx5080-fecf994/candidate-case14-seed1234.json"
+  },
+  "output_fingerprint": {
+    "abs_max": 6.228921890258789,
+    "finite": true,
+    "square_sum": 3276769517.0582695,
+    "sum": -0.1512304403075717
+  },
+  "peak_allocated_bytes": 3770576896,
+  "purpose": "validation oracle only; not a benchmark score or candidate",
+  "schema_version": 1,
+  "streaming": {
+    "batch_chunk_size": 1,
+    "input_rng_note": "deterministic streamed samples; not asserted bitwise-identical to one monolithic batch randn"
+  },
+  "timestamp_utc": "2026-08-30T15:30:51.333275+00:00"
+}
