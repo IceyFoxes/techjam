@@ -107,5 +107,31 @@ class PolyReferenceTests(unittest.TestCase):
         self.assertTrue(torch.allclose(full[1:2, 2:3], one, atol=1e-6))
 
 
+    def _dense_diag(self, a, b, vc):
+        """Dense reimplementation of the diagonal block, for testing the wiring.
+
+        Deliberately not the Triton kernel: this exercises the hook itself on
+        CPU, so a wiring mistake fails everywhere rather than only on CUDA.
+        """
+        blocked = torch.ones(
+            a.shape[1], b.shape[1], device=a.device, dtype=torch.bool
+        ).triu(1)
+        w = torch.exp(a @ b.transpose(-2, -1)).masked_fill_(blocked, 0.0)
+        return (w @ vc).float(), w.sum(-1, keepdim=True, dtype=torch.float32)
+
+    def test_causal_diag_hook_produces_the_same_answer_as_the_dense_block(self):
+        """The hook is an optimization, not a change of function."""
+        from src.implementations.poly_reference import poly_linear_attention
+
+        q, k, v, scale = self._qkv(N=1024)
+        kw = dict(chunk=256, exact_prefix=0, sigma=0.334, **self.CPU_KW)
+
+        base = poly_linear_attention(q, k, v, scale, **kw)
+        hooked = poly_linear_attention(
+            q, k, v, scale, causal_diag=self._dense_diag, **kw
+        )
+        self.assertLess((base - hooked).abs().max().item(), 1e-5)
+
+
 if __name__ == "__main__":
     unittest.main()

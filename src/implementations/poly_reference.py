@@ -71,6 +71,7 @@ def poly_linear_attention(
     compute_dtype: torch.dtype = torch.float16,
     quad_apply: Optional[Callable] = None,
     quad_update: Optional[Callable] = None,
+    causal_diag: Optional[Callable] = None,
 ) -> torch.Tensor:
     """Causal attention with a degree-2 polynomial feature map.
 
@@ -79,6 +80,11 @@ def poly_linear_attention(
     ``quad_apply(a, s) -> [M, C, V]`` and ``quad_update(b, v, out) -> None`` are
     optional accelerated implementations of the two quadratic-term operations.
     When ``None``, dense PyTorch is used.
+
+    ``causal_diag(a, b, vc) -> (num, den)`` optionally replaces the exact
+    diagonal block. The dense form materialises an ``[M, C, C]`` score matrix
+    and masks half of it away; a tiled kernel visits only the tiles below the
+    diagonal. When ``None``, the dense block is used.
     """
     if q.ndim != 4:
         raise ValueError("q, k, v must be [B, H, N, D]")
@@ -106,7 +112,13 @@ def poly_linear_attention(
     # The denominator's quadratic term does NOT need a d^2 feature state.
     gram = torch.zeros(M, D, D, device=dev, dtype=state_dtype)
 
-    blocked_full = torch.ones(chunk, chunk, device=dev, dtype=torch.bool).triu(1)
+    # Only the dense path needs the mask. The tiled kernel masks the diagonal
+    # tile in registers and never visits the tiles above it.
+    blocked_full = (
+        None
+        if causal_diag is not None
+        else torch.ones(chunk, chunk, device=dev, dtype=torch.bool).triu(1)
+    )
 
     for t0 in range(0, N, chunk):
         t1 = min(t0 + chunk, N)
@@ -148,11 +160,17 @@ def poly_linear_attention(
         # combined -- and worth 1.71x on its own at N=100000, B=2. Only the row
         # sum accumulates in float32, where ~512 terms of order 1 would
         # otherwise lose bits.
-        blocked = blocked_full if C == chunk else blocked_full[:C, :C]
-        w = torch.exp(a @ b.transpose(-2, -1)).masked_fill_(blocked, 0.0)
-        num = num + (w @ vc).to(state_dtype)
-        den = den + w.sum(-1, keepdim=True, dtype=torch.float32).to(state_dtype)
-        del w
+        if causal_diag is None:
+            blocked = blocked_full if C == chunk else blocked_full[:C, :C]
+            w = torch.exp(a @ b.transpose(-2, -1)).masked_fill_(blocked, 0.0)
+            d_num = w @ vc
+            d_den = w.sum(-1, keepdim=True, dtype=torch.float32)
+            del w
+        else:
+            d_num, d_den = causal_diag(a, b, vc)
+        num = num + d_num.to(state_dtype)
+        den = den + d_den.to(state_dtype)
+        del d_num, d_den
 
         out[:, :, t0:t1] = (num / den).to(q.dtype).reshape(B, H, C, D)
         del num, den
