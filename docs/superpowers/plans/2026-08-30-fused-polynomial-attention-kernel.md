@@ -21,7 +21,7 @@
 - **Head dimension is 64**, `d_model=1024`, `H=16`, `N=100000`, 2 layers, causal.
 - **Correctness criterion:** `abs(user-ref) <= 0.002 OR abs(user-ref) <= 0.02*abs(ref)`, with **zero** failing elements.
 - **Acceptance:** `<= 360 ms` per sample-layer at N=100000. Above `603.9 ms` is rejected outright.
-- **Polynomial coefficients:** `c0 = 1 - sigma^2/2`, `c1 = 1`, `c2 = 0.5`.
+- **Polynomial coefficients:** `g = exp(sigma^2/2)`, then `c0 = g*(1 - sigma^2/2)`, `c1 = g`, `c2 = g/2`. The `g` factor must **not** be dropped -- the diagonal chunk uses unscaled `exp`, so dropping it de-scales the inter-chunk term by ~5.6% and measures worse than plain Taylor. Corrected during Task 1; see the spec's section 3.
 - Commit after every task. Push the branch after every task.
 
 ---

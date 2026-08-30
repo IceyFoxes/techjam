@@ -54,11 +54,33 @@ Weights use the Gauss-Hermite optimal degree-2 fit to `exp(s)` under the measure
 normalisation, leaving
 
 ```text
-w(s) ~= c0 + c1*s + c2*s^2      c0 = 1 - sigma^2/2,  c1 = 1,  c2 = 1/2
+w(s) ~= g * [ (1 - sigma^2/2) + s + s^2/2 ]        g = exp(sigma^2/2)
 ```
 
-`c0` is the only difference from the plain Taylor constant that `fla`'s Based
-kernel uses, and it measured **2.3x more accurate** at no cost.
+i.e. `c0 = g*(1 - sigma^2/2)`, `c1 = g`, `c2 = g/2`.
+
+**Corrected 30 August 2026.** An earlier draft of this spec gave
+`c0 = 1 - sigma^2/2, c1 = 1, c2 = 1/2`, dropping `g` on the argument that a
+constant factor cancels in the softmax normalisation. That argument is wrong:
+the diagonal chunk is computed with *unscaled* `exp`, so dropping `g` puts the
+inter-chunk polynomial about 5.6% below the intra-chunk block at
+`sigma = 0.334`. Measured relative rms against SDPA:
+
+| variant | N=2048 | N=4096 | N=8192 |
+| --- | ---: | ---: | ---: |
+| plain Taylor (`fla`'s constant) | 0.00873 | 0.01073 | 0.00632 |
+| factor dropped (the earlier draft) | 0.01105 | 0.01237 | 0.00525 |
+| **scale-consistent (this spec)** | **0.00576** | **0.00708** | **0.00420** |
+
+The earlier draft was therefore *worse than plain Taylor* at two of the three
+configurations. The "2.3x more accurate" figure quoted previously came from a
+single configuration (N=8192, `exact_prefix=4096`) and did not generalise. The
+corrected form is uniformly best, at about 1.5x plain Taylor.
+
+The invariant that catches this class of bug: both the polynomial and `exp` must
+have the same mean under `s ~ N(0, sigma^2)`, i.e.
+`c0 + c2*sigma^2 = exp(sigma^2/2)`. It is pinned by
+`src/tests/test_poly_reference.py`.
 
 With `phi2(x) = flatten(x x^T)` in `R^{d^2}`, so that
 `<phi2(a), phi2(b)> = (a.b)^2`, the running state over all strictly preceding
