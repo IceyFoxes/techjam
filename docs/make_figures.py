@@ -166,10 +166,10 @@ def _grouped_log_panel(ax, rows, base_key, cand_key, ylabel) -> None:
     gap = 0.03  # the surface gap that separates adjacent fills
     ax.bar([p - width / 2 - gap / 2 for p in positions],
            [r[base_key] for r in rows], width, color=SERIES_2,
-           label="Immutable reference", zorder=3)
+           label="Original", zorder=3)
     ax.bar([p + width / 2 + gap / 2 for p in positions],
            [r[cand_key] for r in rows], width, color=SERIES_1,
-           label="Shape-aware dispatcher", zorder=3)
+           label="Dispatcher", zorder=3)
     ax.set_yscale("log")
     ax.set_xticks(positions)
     ax.set_xticklabels([str(r["case"]) for r in rows])
@@ -305,15 +305,12 @@ def fig_sigma_guard() -> None:
     """Failed elements against score spread, at N=8192 vs the dense reference.
 
     Sweep transcribed from the calibration table in
-    src/implementations/poly_guard.py, which records the numerics both before
-    and after the Stage 0 kernel rework. Zero failures are drawn at an axis
-    floor because the y axis is logarithmic.
+    src/implementations/poly_guard.py, for the shipped kernel. Zero failures
+    are drawn at an axis floor because the y axis is logarithmic.
     """
     sigma = [0.3339, 0.3681, 0.4040, 0.4188, 0.4416, 0.4649,
              0.4808, 0.5217, 0.5642, 0.6544, 0.7512]
-    after = [0, 0, 0, 0, 1, 0, 1, 19, 319, 9482, 56758]
-    before = {0.3339: 0, 0.4040: 0, 0.4808: 0, 0.5217: 21,
-              0.5642: 308, 0.6544: 9566, 0.7512: 56801}
+    failures = [0, 0, 0, 0, 1, 0, 1, 19, 319, 9482, 56758]
 
     floor = 0.35  # visual stand-in for "zero failures" on a log axis
     fig, ax = plt.subplots(figsize=(COL_W, 2.35))
@@ -321,13 +318,8 @@ def fig_sigma_guard() -> None:
     ax.axvline(0.40, color=SERIES_1, linewidth=1.1, zorder=4)
     ax.axvline(0.3336, color=INK_2, linewidth=0.9, zorder=4)
 
-    bx = sorted(before)
-    ax.plot(bx, [max(before[s], floor) for s in bx], color=SERIES_2,
-            marker="o", markersize=3.6, zorder=5, label="before Stage 0",
-            markeredgecolor=SURFACE, markeredgewidth=0.7)
-    ax.plot(sigma, [max(v, floor) for v in after], color=SERIES_1,
-            marker="s", markersize=3.6, zorder=6,
-            label="after Stage 0 (shipped)", markeredgecolor=SURFACE,
+    ax.plot(sigma, [max(v, floor) for v in failures], color=SERIES_1,
+            marker="s", markersize=3.6, zorder=6, markeredgecolor=SURFACE,
             markeredgewidth=0.7)
 
     ax.set_yscale("log")
@@ -346,7 +338,6 @@ def fig_sigma_guard() -> None:
             color=INK_2, va="bottom", ha="right")
     ax.text(0.40, 1.2, "validated ceiling 0.40", rotation=90, fontsize=6.2,
             color=SERIES_1, va="bottom", ha="right")
-    ax.legend(loc="lower right", handlelength=1.4, borderpad=0.15)
     despine(ax)
     fig.savefig(OUT / "sigma-guard-calibration.png")
     plt.close(fig)
