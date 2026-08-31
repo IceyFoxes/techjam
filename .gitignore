@@ -19,6 +19,8 @@ MY_ROLE.md
 
 # Local and generated artifacts
 artifacts/profiles/
+artifacts/demo-evidence-*/
+artifacts/local-archive/
 *.log
 *.ncu-rep
 *.nsys-rep
