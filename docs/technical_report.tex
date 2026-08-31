@@ -1,0 +1,520 @@
+\documentclass[10pt,conference,compsoc]{IEEEtran}
+\usepackage[utf8]{inputenc}
+\usepackage{authblk}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{float}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{multicol}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\hyphenation{}
+\setcounter{secnumdepth}{4}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em plus 0.05em minus 0.15em}
+
+% Stop LaTeX from stretching vertical glue to make columns flush; without this,
+% leftover space is distributed between headings and paragraphs.
+\raggedbottom
+
+\bstctlcite{IEEEexample:BSTcontrol}
+
+\lstdefinestyle{code}{
+    basicstyle=\ttfamily\scriptsize,
+    breaklines=true,
+    frame=single,
+    keywordstyle=\color{blue}\bfseries,
+    columns=fullflexible,
+    showstringspaces=false,
+    captionpos=b,
+    aboveskip=4pt,
+    belowskip=6pt
+}
+
+\begin{document}
+
+% Title and Author
+\title{Shape-Aware Kernel Dispatch for a Fixed Transformer Layer\\TechJam 2026 Task 3 Final Report}
+\author{Kevin Zhang}
+\author{Isaac Ong}
+\author{Hon Yi Hao}
+\author{Danny Chan}
+\affil{TechJam 2026 --- Task 3: Implement a GPU Kernel for a Transformer Layer}
+\date{31 August 2026}
+\maketitle
+
+% Abstract
+\begin{abstract}
+The disclosed test matrix for a single fixed Transformer layer spans a batch size from 1 to 10{,}000, a head dimension from 8 to 256, and a sequence length from 32 to 100{,}000. No single kernel is best across that range, and one shape cannot execute at all under the reference formulation --- its attention score tensor alone would require 10.24\,TB. We therefore submit a strict shape-aware dispatcher rather than one universal kernel, and we treat the choice of route as a measurement problem instead of a design preference. Every candidate route was gated against the immutable reference under the executable per-element criterion, timed with a paired interleaved schedule that cancels GPU clock drift, and admitted only when its gain exceeded the run's own noise floor. On an NVIDIA GeForce RTX 5080, the final dispatcher passes 65/65 accuracy trials on the thirteen directly comparable shapes with zero failed elements and a \textbf{3.611$\times$ geometric-mean speedup}, reduces peak allocation by up to 90.4\%, and makes the fourteenth shape executable in linear memory at 3.6\,GiB, where it passes five full-scale trials against a validated FP32 oracle with zero failures across 16.384 billion output elements.
+\end{abstract}
+
+% Introduction
+\section{Introduction}
+\IEEEPARstart{T}{he} task fixes the arithmetic of a Transformer layer and asks for GPU kernels that compute it faster while remaining numerically indistinguishable from a PyTorch reference. The reference is
+\texttt{torch\_transformer\_benchmark.py}, which is immutable: it defines the model, the inputs, and the checker. Fourteen input shapes are disclosed in advance, and participants are explicitly permitted to select implementations by shape check.
+
+That permission is the whole design. Table~\ref{tab:shapes} shows why. The disclosed shapes are not perturbations of one workload; they are five qualitatively different regimes that happen to share a formula:
+
+\begin{enumerate}
+    \item \textbf{Launch-bound} (Cases 2, 3, 4, 12). A whole forward pass finishes in about a millisecond, so kernel launch and Python dispatch dominate the actual arithmetic.
+    \item \textbf{Memory-bound attention} (Cases 1, 5, 7, 9--11, 13). The $N \times N$ score tensor is read and written roughly twelve times per layer to perform comparatively little matrix multiplication.
+    \item \textbf{Projection-bound} (Case 8). At $d_\text{model}=1024$ and $N=128$ the dense GEMMs dominate and attention is only 15.7\% of the work.
+    \item \textbf{Capacity-bound} (Case 6). A batch of 10{,}000 makes the dense activation set exceed 10\,GiB.
+    \item \textbf{Infeasible as written} (Case 14). At $B{=}32$, $H{=}16$, $N{=}100{,}000$ the score tensor holds $5.12 \times 10^{12}$ values, or 10.24\,TB in FP16.
+\end{enumerate}
+
+An optimization that wins decisively in one regime is frequently neutral or harmful in another, and we measured several that are. Fusing the three Q/K/V projections into one packed GEMM is worth 1.19$\times$ on Case 3 and 1.003$\times$ on Case 8. A degree-2 polynomial feature map makes Case 14's attention tractable and makes Case 6's attention 186$\times$ slower. Running the whole model in FP16 passes on two-layer Case 14 and fails on the four-layer shapes.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\begin{tabular}{r r r r r r r l}
+\hline
+\textbf{\#} & \textbf{$B$} & \textbf{$d_\text{model}$} & \textbf{$H$} & \textbf{$N$} & \textbf{$L$} & \textbf{FFN} & \textbf{Regime} \\
+\hline
+1  & 64     & 128  & 4  & 128     & 4 & 128  & memory-bound \\
+2  & 1      & 128  & 4  & 128     & 4 & 128  & launch-bound \\
+3  & 4      & 128  & 4  & 128     & 4 & 128  & launch-bound \\
+4  & 16     & 128  & 4  & 128     & 4 & 128  & launch-bound \\
+5  & 128    & 128  & 4  & 128     & 4 & 128  & memory-bound \\
+6  & 10000  & 128  & 4  & 128     & 4 & 128  & capacity-bound \\
+7  & 64     & 32   & 4  & 128     & 4 & 32   & memory-bound \\
+8  & 64     & 1024 & 4  & 128     & 4 & 1024 & projection-bound \\
+9  & 64     & 128  & 1  & 128     & 4 & 128  & memory-bound \\
+10 & 64     & 128  & 2  & 128     & 4 & 128  & memory-bound \\
+11 & 64     & 128  & 16 & 128     & 4 & 128  & memory-bound \\
+12 & 64     & 128  & 4  & 32      & 4 & 128  & launch-bound \\
+13 & 64     & 128  & 4  & 1024    & 4 & 128  & memory-bound \\
+14 & 32     & 1024 & 16 & 100000  & 2 & 1024 & infeasible dense \\
+\hline
+\end{tabular}
+\vspace{6pt}
+\caption{The fourteen disclosed shapes. Every case is causal. The regime column is our classification, derived from the cost analysis in \S\ref{sec:method}.}
+\label{tab:shapes}
+\end{table}
+
+Our contribution is therefore not a kernel but a \emph{decision procedure} and the evidence behind it. We report:
+
+\begin{enumerate}
+    \item A measurement methodology (\S\ref{sec:method}) built for a machine whose clocks move 2$\times$ under sustained load, including a paired interleaved schedule and a per-run noise floor that decides whether a result may be believed at all.
+    \item A shape-aware dispatcher (\S\ref{sec:impl}) that routes on the complete disclosed tuple plus the runtime numerical contract, and refuses rather than guesses when either is unrecognized.
+    \item Final RTX 5080 results (\S\ref{sec:results}), including the memory reductions that matter more than latency on the two extreme shapes.
+    \item The rejected optimizations (\S\ref{sec:negative}), which are a larger set than the accepted ones and are the part of this work most likely to save someone else time.
+    \item An account of how AI assistance was actually used (\S\ref{sec:ai}), including the five occasions on which measurement contradicted a confident AI recommendation.
+\end{enumerate}
+
+\section{Problem and Correctness Contract}
+
+\subsection{The Fixed Computation}
+Each block applies pre-norm attention and a pre-norm GELU feed-forward network with residual additions, and the model applies a final LayerNorm. Attention is written explicitly in the reference (Listing~\ref{lst:ref}), which matters because the explicit form --- not merely the mathematical function --- is what the optimizations below have to reproduce within tolerance.
+
+\begin{lstlisting}[style=code,caption={The reference attention core, abridged from \texttt{BaselineSelfAttention.forward}.},label={lst:ref}]
+scores = torch.matmul(q, k.transpose(-2, -1)) * self.scale
+causal_mask = torch.ones((N, N), dtype=torch.bool,
+                         device=x.device).triu(diagonal=1)
+scores = scores.masked_fill(causal_mask, float("-inf"))
+scores = scores.masked_fill(invalid_keys, float("-inf"))
+probs = torch.softmax(scores.float(), dim=-1).to(dtype=x.dtype)
+output = torch.matmul(probs, v)
+\end{lstlisting}
+
+\subsection{The Executable Criterion}
+An output element passes when
+\begin{equation}
+\lvert c - r \rvert \le 0.002 \;\;\lor\;\; \lvert c - r \rvert \le 0.02\,\lvert r \rvert ,
+\label{eq:tol}
+\end{equation}
+where $c$ is the candidate value and $r$ the reference value. A single failing element fails the whole trial. We adopted three rules from this contract and never relaxed them.
+
+First, the criterion is \emph{executable}, so it is the arbiter and not our judgement about what ``should'' be accurate enough. Second, because it is a disjunction, a reported maximum absolute error above $0.002$ is not automatically a failure --- the same elements may clear the relative arm --- which is why Case 14 passes at $\max_\text{abs}=0.010294$. Third, the tolerance is a \emph{budget}: reassociating arithmetic spends it, and the benchmark's default TF32 matmul precision has already spent most of it before we change anything.
+
+\subsection{What the Contract Forbids}
+The reference rounds attention probabilities back to the model dtype before multiplying by $V$. Under a float16 reference this makes even algebraically free rewrites unsafe: folding the $1/\sqrt{d_k}$ scale into $Q$, which is exact in real arithmetic, flips Cases 7 and 13 to FAIL. We therefore target float32 for the four-layer cases and treat every reassociation as a hypothesis requiring multi-seed evidence.
+
+\section{Research Methodology}
+\label{sec:method}
+Most of the effort in this project went into being able to tell whether a change helped. This section describes that machinery, because every number in \S\ref{sec:results} depends on it.
+
+\subsection{Analytic Cost Model Before Code}
+Each shape family was first characterized on paper, so that measurement time was spent on plausible levers. For Case 13 ($B{=}64$, $H{=}4$, $N{=}1024$, $d_h{=}32$) the score tensor $S$ holds $2.68\times10^{8}$ elements, or 1.00\,GB in fp32. Scaling, two masked fills, and the three-pass softmax each read and write $S$ with no arithmetic reuse, moving roughly 12\,GB per layer and 48\,GB over four layers. Against the development machine's measured 272\,GB/s that is $\approx$176\,ms, while the 137\,GFLOP of attention matmul is $\approx$6.9\,ms at 20\,TFLOP/s. Attention on this shape is memory-bound by roughly 25$\times$, so removing $S$ from memory is nearly the entire problem and faster matrix multiplication is nearly worthless.
+
+The same model, applied to Case 14, gives the opposite answer. There attention is about 95\% of all FLOPs --- roughly 0.655\,PFLOP per causal layer --- and only FLOP \emph{reduction} can help. Conclusions derived at $N \le 1024$ were explicitly scoped and re-tested rather than extrapolated.
+
+\subsection{Operator-Level Attribution}
+Analysis was confirmed with the PyTorch profiler, exported as Perfetto traces with NVTX ranges around each stage. Figure~\ref{fig:attribution} shows the result for Case 13 eager attention and reorders the priorities: the actual attention matmul is the \emph{smallest} cost, and the layout copies produced by \texttt{.contiguous()} in \texttt{\_split\_heads} are 7.1$\times$ larger than it.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig/attention-time-attribution.png}
+\vspace{6pt}
+\caption{Where Case 13's eager attention time actually goes, by operator. Profiled on the RTX 4060 Laptop development machine; this is an attribution measurement used to choose targets, not a latency claim on the RTX 5080. The one operator that performs the attention arithmetic is highlighted.}
+\label{fig:attribution}
+\end{figure}
+
+\subsection{Paired Timing and the Per-Run Noise Floor}
+\label{sec:timing}
+The development GPUs do not hold a stable clock. One sustains roughly 2520\,MHz at 60\,W for about two seconds of continuous load and then settles near 1890\,MHz at 33\,W under a software power cap, and latency changes by about 2$\times$ across that transition. Any schedule that measures one implementation before the other therefore reports a fabricated speedup. We measured this directly: identical code, timed as if it were two variants, drifted 17.5\% between sessions minutes apart, and four identical profiles spread 2.17$\times$.
+
+Three mechanisms address this, and all three are in \texttt{src/infra/timing.py}.
+
+\subsubsection{Settling rather than warmup}
+Iteration-count warmup is insufficient because the boost budget is spent in wall-clock time; a fast shape can complete its warmup entirely inside the boost window and then be timed while clocks are still falling. Each arm is instead held under continuous load for a fixed 10 seconds.
+
+\subsubsection{An interleaved paired schedule}
+Samples are emitted as alternating \texttt{AB} and \texttt{BA} pairs, which gives both labels the same mean position in the run and cancels monotonic drift instead of trying to outrun it. Every sample is recorded as a CUDA event pair before any is resolved, because synchronizing between samples would let the GPU idle back up to boost clocks and hide the very differences the harness exists to detect.
+
+\subsubsection{A noise floor derived from within-pair disagreement}
+Neighbouring samples are measured microseconds apart and see the same clock state, so the per-pair ratio $\rho_i = b_i / c_i$ carries no drift. The run's own resolution limit is the half-width of the 95\% interval around the median ratio,
+\begin{equation}
+\phi \;=\; 1.96 \cdot \frac{1.2533 \cdot \operatorname{sd}(\rho)}{\sqrt{n}} ,
+\label{eq:noise}
+\end{equation}
+where the constant $1.2533$ converts the standard error of the mean to that of the median. A change is accepted only when $\lvert s - 1 \rvert > \phi$ for measured speedup $s$. Launch-bound shapes additionally batch several forward passes into each timed sample, with the block size chosen automatically to target 50\,ms, so per-call CPU scheduling jitter is averaged away rather than reported as signal.
+
+This is why Table~\ref{tab:results} carries a noise column that reaches 62\% on Case 2. That figure is not a defect of the result; it is the honest resolution of a 0.16\,ms measurement, and it is the reason the 7.43$\times$ is still accepted --- the gain is far outside it.
+
+\subsection{Three-Reference Comparison}
+A speedup against the reference is not by itself evidence that the latest change helped. Each promotion was measured against three points in the same session: an immutable-reference A/A control, the dispatcher at its branch base, and the latest dispatcher. The A/A control exposes the machine's launch-bound timing floor and prevents small timing movement from being read as an implementation effect; on the final matrix the two nominally significant controls are Case 1 at 1.106$\times$ and Case 6 at 0.977$\times$.
+
+\subsection{Preserved Evidence and Non-Destructive Research}
+Every accepted run is preserved in a directory named for its date, GPU, and commit --- for example \texttt{research/benchmarks/}\allowbreak\texttt{2026-08-31-rtx5080-775c820/} --- with its exact command, commit, timestamp, input shapes, dtype, correctness result, raw latency samples, memory snapshots, and the full CPU/GPU/driver/CUDA/PyTorch environment. Runs are never overwritten or deleted. A result that later turns out to be wrong is marked \emph{superseded}, \emph{stale}, or \emph{disputed} in the run index with the date, the reason, and a link to the replacement.
+
+This discipline caught real errors. An early 20.75$\times$ compiler result was demoted because it predated the paired-timing correction and lacked the environment metadata to be reproducible. A 342.4\,ms attention-core figure was superseded because it fed contiguous inputs where the real module supplies strided views. A Case-14 kernel that measured 1.561$\times$ in an attention-core microbenchmark was rejected for integration after a full-model wiring measured 16.886$\times$ \emph{slower} at the 16\,GiB VRAM cliff. In each case the original document remains in the repository, labelled, next to the contrary evidence.
+
+\subsection{Parallel Decomposition}
+The work was split four ways --- framework fast paths and integration, attention and softmax, projections and FFN fusion, and extreme-shape memory --- with each stream owning a module and publishing acceptance criteria before implementing. Cross-stream findings were handed off explicitly. The most useful of these was the observation, proven bitwise over 4 cases $\times$ 4 padding ratios $\times$ 4 seeds, that under causal attention the padding key mask is dead code; that result originated in the attention stream and removed a $B \times N$ term from the extreme-shape stream's chunked design.
+
+\subsection{AI-Assisted Development}
+\label{sec:ai}
+AI agents (Codex, driven from VS Code over WSL2) were used throughout, as engineering collaborators rather than as code generators. Concretely they performed repository and upstream-source inspection, task decomposition, profiler-trace interpretation, hypothesis generation, implementation, cross-stream conflict review, benchmark orchestration, and documentation.
+
+The workflow rule that made this productive is that \textbf{an AI suggestion is a hypothesis, not a result}. Nothing entered the dispatcher without passing the executable criterion on five seeds and clearing its run-specific noise floor against all three reference points. The corrections that this discipline forced are the strongest evidence for it:
+
+\begin{itemize}
+    \item A confident recommendation to pack Q/K/V universally was narrowed to Cases 2 and 3 after the end-to-end screen on Case 8 measured 1.003$\times$.
+    \item A blanket ``FP16 fails'' conclusion was found to be over-general: it holds for a float16 \emph{reference}, but not for FP16 internal compute behind an FP32 interface, which passes on Case 14.
+    \item Case-14 kernel configurations tuned for the wrong GPU architecture were rejected on the target device.
+    \item An attention-core speedup was correctly distinguished from a whole-model speedup after a microbenchmark and a full run disagreed by more than an order of magnitude.
+    \item A numerical guard threshold proposed at 0.60, and later measured at 0.45, had to be lowered again to 0.40 when a kernel change moved the accuracy boundary (\S\ref{sec:guard}).
+\end{itemize}
+
+Negative results were preserved rather than discarded, which is why \S\ref{sec:negative} exists.
+
+\section{Implementation}
+\label{sec:impl}
+The submitted candidate is \texttt{DispatchingTransformer} in \texttt{src/dispatcher.py}. It subclasses the reference transformer, so it inherits the exact parameter names and the exact block structure, and replaces only the attention module and the forward entry point.
+
+\subsection{The Routing Key}
+Routing is decided on the complete disclosed tuple \emph{and} the runtime numerical contract:
+\begin{equation*}
+(B,\, N,\, d_\text{model},\, H,\, \text{FFN},\, \text{causal},\, L)
+\end{equation*}
+identifies the official case, and a separate runtime key carries the input shape, device type and index, dtype, device name and compute capability, mask presence, inference/grad state, float32 matmul precision, and the TF32 flag. A route is selected only when every one of these matches preserved evidence. Anything else --- an unrecognized shape, a dtype without integrated numerical evidence, a PyTorch build outside the validated one, altered matmul precision flags --- falls back to the reference arithmetic. The two extreme cases \emph{reject} instead of falling back, because their dense fallback is not memory-safe at the disclosed sizes and would OOM rather than merely run slowly.
+
+Compilation is lazy and per model instance, because the evaluator constructs the model on CPU, copies reference weights, and only then moves it to the final device and dtype. Cached compiled callables are invalidated on any parameter move, dtype conversion, or \texttt{load\_state\_dict}, and a compiled call that raises at runtime demotes permanently to the reference path for that runtime key rather than failing the run.
+
+\subsection{Compiled Float32 SDPA}
+Cases 1, 4, 5, and 7--12 replace explicit score materialization with \texttt{scaled\_dot\_product\_attention} under \texttt{torch.compile(mode=\allowbreak'reduce-overhead')}; Case 13 uses default compilation, which performed better for its larger compute- and memory-bound graph. This single substitution delivers four of the levers identified in \S\ref{sec:method} at once: the score tensor is never materialized \cite{rabe,flash2}, the softmax runs as a single online pass \cite{online}, normalization is deferred to the $[B,H,N,d_h]$ output, and causal block-skipping is already implemented inside the operator. We verified the last point rather than assuming it, timing \texttt{is\_causal=True} against \texttt{is\_causal=False}: the ratio is 0.522 at $N{=}2048$ against a theoretical maximum of 0.5. That measurement is also the main argument \emph{against} hand-writing a causal attention kernel for these shapes.
+
+Compiler mode was chosen by measurement, not by reputation. On Case 2, \texttt{reduce-overhead} measured 6.581$\times$ against 2.212$\times$ for default mode. \texttt{max-autotune} measured 6.609$\times$ --- an indistinguishable runtime result for much more compilation work --- and on Case 8 it failed all five seeds with 7{,}899 bad elements. It is rejected by default.
+
+\subsection{Layout and Mask Elimination}
+SDPA accepts strided inputs, so the \texttt{.contiguous()} copies in \texttt{\_split\_heads} are avoidable; replacing them with transposed views adds a further 6--12\% on top of SDPA and removes the largest single item in Figure~\ref{fig:attribution}.
+
+The padding key mask is removed under a stronger argument. Under causal attention with a right-padded mask, causal masking already writes $-\infty$ at every position the padding mask would, and the reference separately zeroes the invalid query rows, so omitting the key mask is \emph{bitwise} exact --- verified at $0.000\mathrm{e}{+}00$ across 4 cases $\times$ 4 padding ratios $\times$ 4 seeds. The condition is checked, not assumed: a left-padded or interior-hole mask is not removable, so the dispatcher classifies the mask once per runtime key on the host and bakes the decision in before tracing. Classifying it per forward would cost roughly 70\% of Case 2's compiled runtime and erase the gain it buys.
+
+\subsection{Packed QKV Projections}
+Cases 2 and 3 additionally combine the three projection GEMMs into one. The packed weight is rebuilt outside timed execution, refreshed by a \texttt{load\_state\_dict} post-hook, and preserves the reference parameter names so strict weight loading still succeeds. It produces bitwise-identical output to the strided route and passed a 60-trial scale and padding stress gate. It is \emph{not} enabled elsewhere: on Case 8, the shape it was originally proposed for, the end-to-end screen measured 1.003$\times$.
+
+\subsection{Case 6: Batch Streaming}
+Case 6's difficulty is capacity, not arithmetic. The dispatcher streams the batch of 10{,}000 through a bounded float32 SDPA path, choosing the largest power-of-two chunk that fits a conservative budget computed from live free memory, reusable allocator cache, and an 85\% fraction of total VRAM. On an out-of-memory error it halves the chunk and retries, so the route degrades rather than failing. Ordinary model semantics are unchanged.
+
+\subsection{Case 14: Streaming, Mixed Precision, and Guarded Linear Attention}
+Case 14 is the only shape that cannot execute as written. Its dense FP16 score tensor is 10.24\,TB; its FP32 input and output alone are about 24.4\,GiB. Three separate mechanisms make it run.
+
+\subsubsection{Prefix streaming}
+The route processes one valid prefix at a time and passes no attention mask, so nothing in the working set scales with $B \cdot N \cdot d_\text{model}$. Peak allocation for the full shape is 3{,}643.988\,MiB.
+
+\subsubsection{FP32 interface, FP16 compute}
+Parameters and the interface remain FP32; internal attention compute is FP16. This is a per-shape decision, not a global one. Controlled factor tests showed that FP16 attention behind an FP32 residual stream passes the shorter cases, but repeatedly rounding the full residual stream across four layers creates rare failures near zero-valued outputs. Case 14 has two layers and passes; the four-layer cases do not enable it.
+
+\subsubsection{Polynomial feature-map attention}
+At $N{=}100{,}000$ the exact path is compute-bound, so only FLOP reduction helps. We approximate $\exp(s)$ by the degree-2 polynomial that is $L^2$-optimal under the measured score distribution $s \sim \mathcal{N}(0,\sigma^2)$. The Gauss--Hermite projection gives
+\begin{equation}
+\exp(s) \;\approx\; e^{\sigma^{2}/2}\!\left[\left(1 - \tfrac{\sigma^{2}}{2}\right) + s + \tfrac{s^{2}}{2}\right],
+\label{eq:poly}
+\end{equation}
+The $e^{\sigma^2/2}$ factor in Eq.~\ref{eq:poly} does not cancel and must be kept: the diagonal chunk uses unscaled $\exp$, so dropping the factor puts the inter-chunk polynomial about 5.6\% low and measures worse than a plain Taylor expansion. With $a = q\sqrt{\text{scale}}$ and $b = k\sqrt{\text{scale}}$, the feature map
+\begin{equation*}
+\phi(a) = \left[\sqrt{c_0},\; \sqrt{c_1}\,a,\; \sqrt{c_2}\,\mathrm{vec}(a a^{\top})\right]
+\end{equation*}
+satisfies $\phi(a)\!\cdot\!\phi(b) = c_0 + c_1(a\!\cdot\!b) + c_2 (a\!\cdot\!b)^2$. Causal attention then becomes a chunked linear scan over a running state, $O(N d_f d_h)$ instead of $O(N^2 d_h)$ \cite{katharopoulos}. This is the deterministic cousin of Performer's random features \cite{performer} and is closest to the second-order Taylor map of Based \cite{based}, with the Taylor constant replaced by the $\sigma$-fitted one and the local exact component placed at the start of the sequence rather than in a sliding window.
+
+Two properties make it pass. The approximation error concentrates in early tokens, so computing the first 4{,}096 tokens exactly costs 0.17\% of the full quadratic work and cuts maximum error from $6.6\times10^{-3}$ to $1.8\times10^{-3}$. The residual error then sits at one fp16 ULP at the output magnitude and is flat in $N$. The master state must be fp32; an fp16 state is 1.1$\times$ faster, passes at $N{=}16384$, and fails at $N{=}65536$ with 1{,}064{,}935 failures.
+
+The polynomial and the exact path are consumed by two fused Triton kernels \cite{triton} that generate $a a^{\top}$ in registers, so the $C \times d_h^2$ feature tensor --- about 51\,GB per sample-layer --- never reaches HBM.
+
+\subsubsection{Why this is legitimate only here}
+The method trades $O(N^2 d_h)$ for $O(N d_h^3)$, so it wins only when
+\begin{equation}
+N \;>\; 2 d_h^{2}.
+\label{eq:crossover}
+\end{equation}
+Figure~\ref{fig:crossover} places all fourteen shapes against the boundary of Eq.~\ref{eq:crossover}. Only Case 14 is on the profitable side, by roughly 12$\times$; measured on the wrong side it is 2--186$\times$ slower and OOMs on Case 8, whose $O(d_h^3)$ state would be 17.2\,GiB.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig/poly-crossover.png}
+\vspace{6pt}
+\caption{Linear attention is cheaper than exact causal attention only above $N = 2d_h^2$. Thirteen of the fourteen disclosed shapes sit on the exact side; Case 14 sits far inside the shaded region. Overlapping shapes share one marker.}
+\label{fig:crossover}
+\end{figure}
+
+\subsubsection{The runtime guard}
+\label{sec:guard}
+The approximation's accuracy depends on $\sigma$, which is a property of the benchmark's random initialization rather than of attention. Under trained weights, scores are far larger, the softmax is peaked, and a degree-2 fit would be poor. This must not be presented as a general fast-attention result, so the route is gated at runtime: $\sigma$ is estimated from a 512-row sample, and the polynomial path runs only when $\sigma \le 0.40$. Otherwise the route forces exact Flash SDPA --- never a quadratic fallback that would OOM.
+
+The ceiling was set by the sweep in Figure~\ref{fig:sigma}, obtained by scaling the Q/K/V projection weights of both reference and candidate and recording where the criterion first fails. Two details of that sweep changed the shipped value. First, the boundary moved when the kernels changed: $\sigma=0.4808$ passed before the Stage 0 rework and fails after it, so a ceiling of 0.45 --- itself already a measured value --- would have admitted a failing configuration. Second, near the boundary the failure count is not monotonic, which is a reason to sit below the largest clean pass rather than interpolate a crossing point. The shipped ceiling of 0.40 sits below the largest clean pass at 0.4188 and about 20\% above the operating point, whose seed-to-seed spread is 0.3327 to 0.3343.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig/sigma-guard-calibration.png}
+\vspace{6pt}
+\caption{Calibration of the polynomial route's runtime guard, at $N{=}8192$ against the dense reference. The shaded band is the admitted range. A guard threshold measured once is not permanently valid: the Stage 0 kernel rework moved the failure boundary left, and the ceiling had to be lowered with it.}
+\label{fig:sigma}
+\end{figure}
+
+Two further points make the guard honest rather than decorative. It is not what keeps Cases 1--13 safe: $\sigma$ measures 0.333 on \emph{every} case, so the guard would happily admit all of them, and it is the dispatcher's shape check that excludes them. And it is conservative for the target shape, because it was calibrated at $N{=}8192$ while attention contributes less to the residual stream as $N$ grows.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Environment}
+All final results are from the single machine in Table~\ref{tab:env}. The benchmark sets float32 matmul precision to \texttt{high}, enables TF32, uses input scale 1.0 with zero padding, and executes on CUDA.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{p{2.1cm} p{5.4cm}}
+\hline
+\textbf{Component} & \textbf{Final benchmark machine} \\
+\hline
+CPU & AMD Ryzen 7 9800X3D, 8 cores / 16 threads \\
+CPU cache & 384\,KiB L1d, 256\,KiB L1i, 8\,MiB L2, 96\,MiB L3 \\
+GPU & NVIDIA GeForce RTX 5080, compute capability 12.0 \\
+GPU memory & 16{,}303\,MiB \\
+GPU limits & 360\,W; max queried SM clock 3{,}090\,MHz; memory clock 15{,}001\,MHz \\
+Driver / CUDA & NVIDIA 616.56 / CUDA 13.0 \\
+cuDNN & 9.2.0 \\
+PyTorch / Triton & 2.13.0+cu130 / 3.7.1 \\
+Python & 3.12.3 \\
+OS & WSL2, Linux 6.6.114.1, x86-64, glibc 2.39 \\
+Disk & 1{,}007\,GiB filesystem; 616\,GiB free before the run \\
+\hline
+\end{tabular}
+\vspace{6pt}
+\caption{Final benchmark environment.}
+\label{tab:env}
+\end{table}
+
+Accuracy uses five seeds (1234--1238). Timing follows \S\ref{sec:timing}: paired interleaved CUDA events, 10\,s of settling per arm, 100 paired samples, and an automatically selected block targeting 50\,ms. Memory is probed after route compilation and replay are warm. The candidate is self-compiling and the harness refuses to wrap it in an external compiler.
+
+\subsection{Cases 1--13}
+Table~\ref{tab:results} and Figure~\ref{fig:speedup} give the directly comparable results. Every case passes 5/5 accuracy trials with zero failed elements, and every improvement clears its own noise floor. The geometric-mean speedup is \textbf{3.611$\times$}, ranging from 1.116$\times$ on projection-bound Case 8 to 8.577$\times$ on long-sequence Case 13.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{r r r r r r}
+\hline
+\textbf{Case} & \textbf{Base ms} & \textbf{Cand.\ ms} & \textbf{Speedup} & \textbf{Noise} & \textbf{Max abs} \\
+\hline
+1  & 1.9350   & 0.6975  & 2.774$\times$ & 25.30\% & 0.001054 \\
+2  & 1.1953   & 0.1609  & 7.428$\times$ & 62.49\% & 0.000819 \\
+3  & 0.9788   & 0.1643  & 5.959$\times$ & 34.53\% & 0.000908 \\
+4  & 1.1567   & 0.2678  & 4.319$\times$ & 17.64\% & 0.000908 \\
+5  & 3.0159   & 1.2513  & 2.410$\times$ & 8.85\%  & 0.001181 \\
+6  & 504.1028 & 210.5723& 2.394$\times$ & 0.52\%  & 0.001347 \\
+7  & 1.5418   & 0.4060  & 3.797$\times$ & 33.12\% & 0.001316 \\
+8  & 17.3913  & 15.5889 & 1.116$\times$ & 0.82\%  & 0.001218 \\
+9  & 1.5037   & 0.6881  & 2.185$\times$ & 11.03\% & 0.001078 \\
+10 & 1.8052   & 0.6464  & 2.793$\times$ & 20.44\% & 0.001089 \\
+11 & 7.6778   & 1.3724  & 5.595$\times$ & 7.27\%  & 0.001063 \\
+12 & 1.0901   & 0.2335  & 4.668$\times$ & 41.84\% & 0.001128 \\
+13 & 116.7147 & 13.6078 & 8.577$\times$ & 9.12\%  & 0.001123 \\
+\hline
+\multicolumn{3}{l}{\textbf{Geometric mean}} & \textbf{3.611$\times$} & & \\
+\hline
+\end{tabular}
+\vspace{6pt}
+\caption{Final RTX 5080 results at commit \texttt{775c820}. Every row is PASS 5/5 with zero failed elements, and every speedup exceeds its own noise floor per Eq.~\ref{eq:noise}.}
+\label{tab:results}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{fig/speedup-by-case.png}
+\vspace{6pt}
+\caption{Per-case speedup over the immutable dense reference, with the run-specific 95\% noise floor of Eq.~\ref{eq:noise} as error bars. Wide bars belong to sub-millisecond shapes, where the measurement floor is genuinely wide; the gains still clear it.}
+\label{fig:speedup}
+\end{figure}
+
+\subsection{Latency and Memory Together}
+Figure~\ref{fig:latmem} plots both axes of the result, and the memory panel carries information the speedup table does not. On the two shapes where allocation is the binding constraint the reduction is decisive: Case 6 falls from 10{,}672.719\,MiB to 2{,}312.512\,MiB ($-78.3\%$) and Case 13 from 2{,}372.229\,MiB to 227.104\,MiB ($-90.4\%$).
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{fig/latency-and-memory.png}
+\vspace{6pt}
+\caption{Cases 1--13 on the RTX 5080, both axes on log scales. (a) Median steady-state latency. (b) Peak allocated memory. The four cases where the candidate's peak is \emph{higher} --- 2, 3, 4 and 12 --- are all sub-millisecond shapes whose absolute peak is dominated by resident compiler caches rather than by model activations.}
+\label{fig:latmem}
+\end{figure*}
+
+The four cases where candidate peak allocation is higher than baseline are Cases 2, 3, 4 and 12, all under 70\,MiB in absolute terms. Those figures include resident Inductor and CUDA Graph caches and are not a standalone model-footprint measurement. We report them unadjusted rather than subtracting the compiler's own memory.
+
+\subsection{Case 14}
+Case 14 has no dense baseline, so it is reported separately and is \emph{not} folded into the 3.611$\times$ geometric mean. The immutable dense model cannot run at the target shape, and the reference accuracy checker independently exhausts memory at this output size because it retains full input, reference, and candidate tensors and then creates FP32 copies and boolean temporaries.
+
+The harness therefore does four things. It validates a linear-memory FP32 oracle against the immutable dense model at $B{=}1$, $N{=}4096$, obtaining 0/4{,}194{,}304 failures at $\max_\text{abs}=0.00060248$. It generates one deterministic FP32 sample at a time at the full $B{=}32$, $N{=}100{,}000$, $d_\text{model}{=}1024$ shape. It passes that identical sample to both the oracle and the FP32-facing candidate. And it reduces the comparison in bounded token chunks, discarding each sample's outputs immediately. Table~\ref{tab:case14} gives the result.
+
+\begin{table}[H]
+\centering
+\footnotesize
+\begin{tabular}{p{2.6cm} p{4.9cm}}
+\hline
+\textbf{Quantity} & \textbf{Value} \\
+\hline
+Accuracy & PASS 5/5 trials, 0 failures across 16{,}384{,}000{,}000 elements \\
+Max absolute error & 0.010294 (passes via the 2\% relative arm of Eq.~\ref{eq:tol}) \\
+Mean absolute error & 0.000374 \\
+Oracle time & 601.975\,s \\
+Candidate time & 67.095\,s \\
+Diagnostic ratio & 8.972$\times$ \\
+Peak allocation & 3{,}643.988\,MiB \\
+Measured $\sigma$ per layer & 0.3340, 0.3345 (guard ceiling 0.40) \\
+\hline
+\end{tabular}
+\vspace{6pt}
+\caption{Case 14 against the validated streamed FP32 oracle. The 8.972$\times$ ratio compares two linear-memory proxies and is explicitly not an immutable dense-baseline speedup.}
+\label{tab:case14}
+\end{table}
+
+\subsection{Regression Check}
+The final implementation changes only Case 14 relative to branch base \texttt{3e6a3ea}. Cases 1--13 reproduce with no accuracy regression, and candidate latency moves between $-1.82\%$ and $+2.14\%$ --- within the noise floors of Table~\ref{tab:results} on every row. The CUDA-aware unit suite (210 tests, including dispatcher and kernel coverage) passes.
+
+\section{Discussion}
+
+\subsection{Why the Gains Are Where They Are}
+The speedup pattern follows the regime classification of Table~\ref{tab:shapes} almost exactly. The largest gains are on memory-bound attention (Case 13 at 8.577$\times$, Case 11 at 5.595$\times$), where removing the score tensor from memory removes most of the runtime. The next largest are on launch-bound shapes (Case 2 at 7.428$\times$), where CUDA Graph replay removes per-call dispatch that was most of the measured time. The smallest is on projection-bound Case 8 at 1.116$\times$, and this is a ceiling rather than a shortfall: attention is only 15.7\% of that shape's work, so even perfect attention leaves the dense GEMMs untouched. We probed those GEMMs directly, expanding 727 valid cuBLASLt algorithm configurations per layout, and the best admissible bias-plus-residual epilogue projected only about 1.010$\times$ whole-model. That route was rejected before integration.
+
+\subsection{On Reporting Large Noise Floors}
+Seven of the thirteen cases have noise floors above 17\%. It would be easy to present tighter numbers by timing a single arm after a long warmup, and it would be wrong. These are shapes whose entire forward pass takes between 0.16\,ms and 1.9\,ms depending on the arm, on a GPU whose clocks move by a factor of two; a 20\% measurement floor is what that machine can actually resolve, and Eq.~\ref{eq:noise} reports it rather than hiding it. The corresponding gains on those seven rows are 2.8--7.4$\times$, so the conclusions are unaffected, but the exact point estimates on those rows may move between runs and should not be over-read.
+
+\subsection{What the Geometric Mean Excludes}
+Case 14's 8.972$\times$ is a ratio between two linear-memory proxies, both of which we wrote. Including it would inflate the headline figure with a number that has no dense baseline behind it. The defensible claim for Case 14 is not speed but \emph{feasibility with proven accuracy}: a computation whose reference formulation needs multi-terabyte tensors now runs in 3.6\,GiB and passes a per-element criterion against an oracle that was itself validated against the immutable model.
+
+\subsection{Generality}
+The polynomial route is the one component that is benchmark-specific by construction, and we would rather say so plainly than let the runtime guard imply otherwise. It works because $\sigma \approx 0.334$ is a consequence of the benchmark's default \texttt{nn.Linear} initialization: a LayerNormed input gives $q,k$ component RMS 0.577, which fixes the score spread independently of $N$ and of $d_\text{model}$. Under trained weights the softmax is peaked and a degree-2 fit would be poor. Everything else in the dispatcher --- SDPA substitution, strided views, mask elimination, packed QKV, batch and prefix streaming --- is a standard optimization that transfers.
+
+\section{Rejected Optimizations}
+\label{sec:negative}
+Table~\ref{tab:negative} lists directions that were implemented or measured and then rejected. Each cost real measurement time, and each closes a plausible-looking path.
+
+\begin{table}[H]
+\centering
+\scriptsize
+\begin{tabular}{p{2.35cm} p{2.2cm} p{2.6cm}}
+\hline
+\textbf{Direction} & \textbf{Measured} & \textbf{Why rejected} \\
+\hline
+\texttt{max-autotune} everywhere & Case 8 FAIL 5/5, 7{,}899 bad elements & No runtime gain over \texttt{reduce-overhead} and it breaks the criterion \\
+Whole-model FP16 & Cases 7, 13 FAIL & Reference rounds probabilities to fp16 before $PV$; even folding \texttt{scale} breaks it \\
+FP16 attention internals (fp32 cases) & PASS, but slower & Cast overhead exceeds the tensor-core throughput at these sizes \\
+Universal packed QKV & Case 8 1.003$\times$ & Below the noise floor; kept only for Cases 2 and 3 \\
+Selective GEMM autotuning, prepacked weights & Neutral & No measurable gain, and autotuning was numerically invalid \\
+Direct cuBLASLt Case-8 epilogue & 727 configs; 1.010$\times$ projected & Amdahl ceiling too low to justify integration \\
+Triton output/residual fusion (Case 5) & $\approx$9\% faster & 22{,}132 stress-matrix elements fail \\
+Order-1 linear attention (Case 14) & 4.36$\times$ & 957 failures at $N{=}65536$; the quadratic term is required \\
+fp16 polynomial state & 1.32$\times$ & Passes at $N{=}16384$, fails at $N{=}65536$ with 1{,}064{,}935 failures \\
+Symmetric feature packing & 750.5 vs 526.7\,ms & The two gathers cost more than the bandwidth saved \\
+Sparse / top-$k$ attention (Case 14) & 89\% effective softmax support & Nothing to prune: top-64 keys hold 3.4\% of the mass \\
+Persistent-slab scan (Case 14) & Kernels at 24--27 TFLOPS & No longer traffic-limited after Stage 0; the premise expired \\
+\hline
+\end{tabular}
+\vspace{6pt}
+\caption{Measured and rejected directions.}
+\label{tab:negative}
+\end{table}
+
+Two entries deserve emphasis. The fp16 polynomial state is a trap: it is the fastest correct-\emph{looking} option and passes every cheap small-$N$ test, failing only at the scale that matters, because several hundred chunk contributions accumulate and small increments are lost against a large fp16 accumulator. And the sparse-attention exclusion is worth more than the argument it replaced --- the original reasoning was that any approximation must fail a per-element tolerance, which is false as stated; the measurement that the softmax over 100{,}000 keys has 89\% effective support is both true and independent of the tolerance.
+
+\section{Reflection and Next Steps}
+The submitted system answers the task's actual question --- can AI-assisted development produce efficient shape-specific implementations in limited time --- with a qualified yes. Fourteen shapes are covered by five optimized routes and a reference fallback, thirteen of them are 1.116--8.577$\times$ faster with zero failed elements, the fourteenth executes at all, and the whole thing falls back or refuses rather than guessing when its preconditions are not met. The qualification is that the AI leverage came from breadth and speed of hypothesis generation, and every hypothesis still had to survive an evidence gate that we had to build first.
+
+Four directions follow from what the evidence showed rather than from what was left unfinished.
+
+\begin{enumerate}
+    \item \textbf{Case 8 needs a fused epilogue, not a better GEMM.} The cuBLASLt probe closed the algorithm-selection route with 727 configurations. The remaining opportunity is a same-mainloop bias-plus-residual-plus-LayerNorm epilogue compiled for SM120, which the probe estimated needs about 1.156$\times$ on the targeted boundary to project a 5\% whole-model gain.
+    \item \textbf{Mixed precision without repeated casts.} FP16 attention passes behind an FP32 residual stream but is slower, because the down-cast and up-cast cost more than the throughput they buy. A fusion that keeps the residual stream in FP32 without materializing cast kernels is the clearest remaining precision opportunity for the four-layer shapes.
+    \item \textbf{Cold-start cost.} Timing deliberately excludes compilation, which is correct for a long-lived inference service and wrong for a one-shot invocation. Case 14 is a single forward pass, and its Triton autotune space had to be kept deliberately narrow --- 12 configurations for one kernel and 8 for the other --- because widening it produced roughly 400 kernel compilations that landed directly in the measured wall clock. A route that is fast only after a warm cache should be reported as such.
+    \item \textbf{Portability.} Every performance claim here is pinned to one GPU and one PyTorch build, and the dispatcher enforces that pin rather than extrapolating. Widening it is not a matter of relaxing the check; it requires a fresh correctness and timing gate per device, which is exactly the work the methodology in \S\ref{sec:method} was built to make cheap.
+\end{enumerate}
+
+\section*{Reproduction}
+The repository is at \url{https://github.com/IceyFoxes/techjam}. Figures in this report are regenerated from the preserved benchmark JSON by \texttt{docs/make\_figures.py}. Any directly comparable case runs as shown in Listing~\ref{lst:repro}, substituting \texttt{-{}-case} 1 through 13.
+
+\begin{lstlisting}[style=code,caption={Reproducing one official case.},label={lst:repro}]
+.venv/bin/python -m src.benchmark \
+  --candidate src.dispatcher --case 6 \
+  --device cuda --dtype float32 \
+  --accuracy-trials 5 --seed 1234 \
+  --warmup 20 --repeats 100 --benchmark-rounds 3 \
+  --timing paired --settle-seconds 10 \
+  --output research/benchmarks/DATE-GPU-COMMIT/result.json
+\end{lstlisting}
+
+\section*{Team Contributions}
+\textbf{Person 1} built the benchmark infrastructure, the compilation strategy, the final dispatcher, and the full-matrix validation. \textbf{Person 2} owned the attention and softmax decomposition, SDPA selection, the Case-14 polynomial attention research, kernel design, and numerical guard calibration. \textbf{Person 3} owned projection and FFN profiling and the packed-QKV implementation for Cases 2 and 3. \textbf{Person 4} owned the extreme-shape memory model, batch and prefix streaming, the Case-6 route, and Case-14 tractability. The authoritative split and the cross-stream handoffs are preserved in the repository.
+
+\begin{thebibliography}{1}
+
+\bibitem{flash2}
+T.~Dao, ``FlashAttention-2: Faster attention with better parallelism and work partitioning,'' in \emph{Proc. Int. Conf. Learning Representations (ICLR)}, 2024. [Online]. Available: \url{https://arxiv.org/abs/2307.08691}
+
+\bibitem{rabe}
+M.~N. Rabe and C.~Staats, ``Self-attention does not need $O(n^2)$ memory,'' arXiv:2112.05682, 2021.
+
+\bibitem{online}
+M.~Milakov and N.~Gimelshein, ``Online normalizer calculation for softmax,'' arXiv:1805.02867, 2018.
+
+\bibitem{based}
+S.~Arora, S.~Eyuboglu, M.~Zhang, et al., ``Simple linear attention language models balance the recall-throughput tradeoff,'' in \emph{Proc. Int. Conf. Machine Learning (ICML)}, 2024. [Online]. Available: \url{https://arxiv.org/abs/2402.18668}
+
+\bibitem{katharopoulos}
+A.~Katharopoulos, A.~Vyas, N.~Pappas, and F.~Fleuret, ``Transformers are RNNs: Fast autoregressive transformers with linear attention,'' in \emph{Proc. Int. Conf. Machine Learning (ICML)}, 2020.
+
+\bibitem{performer}
+K.~Choromanski, V.~Likhosherstov, D.~Dohan, et al., ``Rethinking attention with Performers,'' in \emph{Proc. Int. Conf. Learning Representations (ICLR)}, 2021.
+
+\bibitem{quest}
+J.~Tang, Y.~Zhao, K.~Zhu, G.~Xiao, B.~Kasikci, and S.~Han, ``Quest: Query-aware sparsity for efficient long-context LLM inference,'' in \emph{Proc. Int. Conf. Machine Learning (ICML)}, 2024.
+
+\bibitem{minference}
+H.~Jiang, Y.~Li, C.~Zhang, et al., ``MInference 1.0: Accelerating pre-filling for long-context LLMs via dynamic sparse attention,'' in \emph{Advances in Neural Information Processing Systems (NeurIPS)}, 2024.
+
+\bibitem{triton}
+P.~Tillet, H.~T. Kung, and D.~Cox, ``Triton: An intermediate language and compiler for tiled neural network computations,'' in \emph{Proc. 3rd ACM SIGPLAN Int. Workshop on Machine Learning and Programming Languages (MAPL)}, 2019, pp. 10--19.
+
+\bibitem{pt2}
+J.~Ansel, E.~Yang, H.~He, et al., ``PyTorch 2: Faster machine learning through dynamic Python bytecode transformation and graph compilation,'' in \emph{Proc. 29th ACM Int. Conf. Architectural Support for Programming Languages and Operating Systems (ASPLOS)}, 2024.
+
+\bibitem{sdpa}
+PyTorch, ``\texttt{torch.nn.functional.scaled\_dot\_product\_attention},'' PyTorch documentation. Accessed 29 August 2026. [Online]. Available: \url{https://docs.pytorch.org/docs/main/generated/torch.nn.functional.scaled_dot_product_attention.html}
+
+\end{thebibliography}
+
+\end{document}
