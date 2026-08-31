@@ -62,7 +62,8 @@ def main() -> int:
     allowed = {6: ("float32",), 14: ("float16",)}
     if args.dtype not in allowed[args.case]:
         raise ValueError(
-            f"Case {args.case} supports only {', '.join(allowed[args.case])}"
+            f"candidate-only smoke for Case {args.case} supports only "
+            f"{', '.join(allowed[args.case])}"
         )
     if not 0.0 <= args.padding_ratio < 1.0:
         raise ValueError("padding_ratio must be in [0, 1)")

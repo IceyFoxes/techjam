@@ -511,12 +511,17 @@ def main() -> int:
     official_case_id = _resolve_shape(args)
     spec = load_candidate(args.candidate)
     device, dtype = _configure(args)
+    streamed_case14_fp32 = (
+        official_case_id == 14
+        and args.dtype == "float32"
+        and spec.name == "dispatcher"
+    )
     validate_candidate_execution(
         spec,
         official_case_id,
         compile_user=args.compile_user,
         dtype_name=args.dtype,
-        candidate_only=False,
+        candidate_only=streamed_case14_fp32,
         input_scale=args.input_scale,
         device_type=device.type,
         cuda_capability=(
@@ -536,6 +541,30 @@ def main() -> int:
         causal=args.causal,
     )
     config.validate()
+    if streamed_case14_fp32:
+        if args.padding_ratio != 0.0:
+            raise ValueError(
+                "the streamed Case-14 FP32 benchmark currently requires "
+                "padding-ratio 0"
+            )
+        from src.case14_fp32_reference import run as run_case14_fp32
+
+        print(
+            "Case 14 FP32: using the linear-memory streamed oracle and the "
+            "dispatcher mixed-precision route; dense baseline timing is unavailable"
+        )
+        streamed_args = argparse.Namespace(
+            batch_size=config.batch_size,
+            seq_len=config.seq_len,
+            seed=args.seed,
+            trials=args.accuracy_trials,
+            input_scale=args.input_scale,
+            validate_dense_n=min(4096, config.seq_len),
+            device=str(device),
+            compare_current_candidate=True,
+            output=args.output,
+        )
+        return run_case14_fp32(streamed_args)
     baseline, candidate, strict = _build_models(
         spec, config, device, dtype, args
     )
