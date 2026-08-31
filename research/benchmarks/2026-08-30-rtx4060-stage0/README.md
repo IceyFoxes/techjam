@@ -3,7 +3,7 @@
 Closing measurement for Stage 0 of
 [`../../attention-softmax/integrated-kernel-spec.md`](../../attention-softmax/integrated-kernel-spec.md),
 executed from
-[`../../../docs/superpowers/plans/2026-08-30-integrated-polynomial-kernel-stage0.md`](../../../docs/superpowers/plans/2026-08-30-integrated-polynomial-kernel-stage0.md).
+[`../../implementation-plans/2026-08-30-integrated-polynomial-kernel-stage0.md`](../../implementation-plans/2026-08-30-integrated-polynomial-kernel-stage0.md).
 
 Date: 30 August 2026. Branch `fused-kernal`, commits `cabeb53` through the guard
 fix. Verdict: **Stage 0 ACCEPTED — 1.439x, and Design B rejected with evidence.**

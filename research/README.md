@@ -5,6 +5,9 @@
   optimization summary, reproduction commands, AI-assisted workflow, team
   contributions, and limitations.
 - [Team coordination](team-coordination/README.md): ownership and integration planning for the four parallel optimization streams.
+- [Implementation plans](implementation-plans/README.md): preserved execution
+  plans for safe SDPA routing and the fused/integrated polynomial-attention
+  work, with their historical completion status.
 - [Projections, FFN, layout, and elementwise fusion](projections-ffn-fusion/README.md):
   Person 3 research decomposition, source review, and optimization decisions.
 - [Attention and softmax](attention-softmax/README.md): Person 2 decomposition of

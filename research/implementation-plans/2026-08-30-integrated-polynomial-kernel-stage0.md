@@ -8,13 +8,13 @@
 
 **Tech Stack:** PyTorch 2.13.0+cu130, Triton 3.7.1, CUDA 13.0, Python 3.12, `unittest`.
 
-**Spec:** [`research/attention-softmax/integrated-kernel-spec.md`](../../../research/attention-softmax/integrated-kernel-spec.md)
+**Spec:** [`research/attention-softmax/integrated-kernel-spec.md`](../attention-softmax/integrated-kernel-spec.md)
 
 **Scope note:** This plan covers **Stage 0 only**, plus the gate that closes it. Stage 1 is deliberately not planned here: the spec requires Stage 0's re-profile before Stage 1's design is chosen, because F1 alone may move the diagonal block from 25-35% of the path to under 12% and change what Stage 1 should target. Task 8 produces that re-profile and the Stage 1 go/no-go. A second plan follows it.
 
 **Task F0 of the spec is already complete** (commit `708fe73`); its result is baked into the Global Constraints below.
 
-**STATUS: EXECUTED AND ACCEPTED, 30 August 2026.** Stage 0 delivered **1.439x** (328.1 -> 228.0 ms at B=2), 6.135x over exact Flash, +61.4 MiB peak VRAM, zero correctness failures at all six oracle points, 194 tests passing. Two tasks ended in rejections (F6, and Design B at the gate) and one finding forced a fix outside the plan's scope (`SIGMA_CEILING` lowered from 0.45 to 0.40). Full record: [`research/benchmarks/2026-08-30-rtx4060-stage0/`](../../../research/benchmarks/2026-08-30-rtx4060-stage0/README.md).
+**STATUS: EXECUTED AND ACCEPTED, 30 August 2026.** Stage 0 delivered **1.439x** (328.1 -> 228.0 ms at B=2), 6.135x over exact Flash, +61.4 MiB peak VRAM, zero correctness failures at all six oracle points, 194 tests passing. Two tasks ended in rejections (F6, and Design B at the gate) and one finding forced a fix outside the plan's scope (`SIGMA_CEILING` lowered from 0.45 to 0.40). Full record: [`research/benchmarks/2026-08-30-rtx4060-stage0/`](../benchmarks/2026-08-30-rtx4060-stage0/README.md).
 
 ## Global Constraints
 

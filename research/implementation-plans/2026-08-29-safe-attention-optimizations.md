@@ -13,7 +13,7 @@
 - `src/dispatcher.py` — per-case compile modes, `reduce-overhead` for cases 1-12, `default` for case 13, reference fallback otherwise.
 - `src/implementations/attention.py` — still the Person 2 reference scaffold. This is the file this plan replaces.
 
-**Spec:** [`research/attention-softmax/safe-optimization-spec.md`](../../../research/attention-softmax/safe-optimization-spec.md)
+**Spec:** [`research/attention-softmax/safe-optimization-spec.md`](../attention-softmax/safe-optimization-spec.md)
 
 ## Global Constraints
 

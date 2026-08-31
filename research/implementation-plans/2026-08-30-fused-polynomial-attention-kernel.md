@@ -8,7 +8,7 @@
 
 **Tech Stack:** PyTorch 2.13.0+cu130, Triton 3.7.1, CUDA 13.0, Python 3.12, `unittest`.
 
-**Spec:** [`research/attention-softmax/triton-kernel-spec.md`](../../../research/attention-softmax/triton-kernel-spec.md)
+**Spec:** [`research/attention-softmax/triton-kernel-spec.md`](../attention-softmax/triton-kernel-spec.md)
 
 ## Global Constraints
 
