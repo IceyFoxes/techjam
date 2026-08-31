@@ -5,9 +5,9 @@ This document says what changed, what contract each change must not break, and
 how to turn it off.
 
 Status: 30 August 2026, **updated after RTX 5080 end-to-end integration**. Specs:
-[`research/attention-softmax/triton-kernel-spec.md`](../research/attention-softmax/triton-kernel-spec.md)
+[`triton-kernel-spec.md`](triton-kernel-spec.md)
 (Phase 1) and
-[`research/attention-softmax/integrated-kernel-spec.md`](../research/attention-softmax/integrated-kernel-spec.md)
+[`integrated-kernel-spec.md`](integrated-kernel-spec.md)
 (Phase 2).
 
 ## The one-line summary
@@ -122,7 +122,7 @@ than B=2, because `M = B*H` halves and the launch grids shrink with it. B=2 is
 the shape your route streams, and it is the one to judge on.
 
 Full record, including the per-fix A/Bs and two rejected changes:
-[`research/benchmarks/2026-08-30-rtx4060-stage0/`](../research/benchmarks/2026-08-30-rtx4060-stage0/README.md).
+[`research/benchmarks/2026-08-30-rtx4060-stage0/`](../benchmarks/2026-08-30-rtx4060-stage0/README.md).
 
 An earlier version of this document quoted 342.4 ms / 2.12x. That figure is
 superseded: it was measured with contiguous inputs the real module never

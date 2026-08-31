@@ -39,7 +39,7 @@
 | `src/tests/test_poly_guard.py` | Guard logic (CPU-only, no CUDA needed). |
 | `src/tests/test_poly_kernel.py` | Kernel-vs-dense equivalence. |
 | `src/tests/test_poly_attention.py` | End-to-end criterion, fallback, and the fp16-state regression. |
-| `docs/kernel-integration-notes.md` | Written for Persons 1 and 4: what changed in their files and how to disable it. |
+| `research/attention-softmax/kernel-integration-notes.md` | Written for Persons 1 and 4: what changed in their files and how to disable it. |
 
 ---
 
@@ -1485,7 +1485,7 @@ Only if Task 8 accepted. Touches Person 4's and Person 1's files; the repository
 **Files:**
 - Modify: `src/implementations/extreme.py`
 - Test: `src/tests/test_poly_attention.py`
-- Create: `docs/kernel-integration-notes.md`
+- Create: `research/attention-softmax/kernel-integration-notes.md`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1529,7 +1529,7 @@ Add to `src/implementations/extreme.py`:
 ```python
 # Opt-in. Setting this False returns case 14 to exactly the forced-Flash
 # behaviour, which src/tests/test_poly_attention.py pins so it cannot rot.
-# See docs/kernel-integration-notes.md.
+# See research/attention-softmax/kernel-integration-notes.md.
 POLY_ATTENTION_ENABLED = False
 
 
@@ -1587,17 +1587,17 @@ Expected: OK, with the previously passing tests still passing.
 
 - [ ] **Step 5: Write the integration notes**
 
-Create `docs/kernel-integration-notes.md` for Persons 1 and 4, stating: what changed in `extreme.py` and why; that `POLY_ATTENTION_ENABLED = False` restores today's behaviour exactly and is covered by a test; that the memory contract is unchanged; that the guard's host synchronization must stay in the eager layer; the measured evidence from Tasks 6-8; and that the approximation depends on the benchmark's `sigma`.
+Create `research/attention-softmax/kernel-integration-notes.md` for Persons 1 and 4, stating: what changed in `extreme.py` and why; that `POLY_ATTENTION_ENABLED = False` restores today's behaviour exactly and is covered by a test; that the memory contract is unchanged; that the guard's host synchronization must stay in the eager layer; the measured evidence from Tasks 6-8; and that the approximation depends on the benchmark's `sigma`.
 
 - [ ] **Step 6: Commit and open the PR**
 
 ```bash
-git add src/implementations/extreme.py src/tests/test_poly_attention.py docs/kernel-integration-notes.md
+git add src/implementations/extreme.py src/tests/test_poly_attention.py research/attention-softmax/kernel-integration-notes.md
 git commit -m "feat(extreme): add the opt-in polynomial attention route for case 14
 
 Disabled by default. POLY_ATTENTION_ENABLED = False restores the forced-Flash
 behaviour exactly, and a test pins that so it cannot rot. Touches Person 4's
-file; docs/kernel-integration-notes.md records the memory and synchronization
+file; research/attention-softmax/kernel-integration-notes.md records the memory and synchronization
 contracts it must not break."
 git push origin fused-kernal
 gh pr create --title "Fused polynomial attention kernel for case 14" --body "..."

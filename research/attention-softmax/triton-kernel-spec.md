@@ -341,7 +341,7 @@ so the owning stream can review it as a diff rather than a surprise.
 | --- | --- | --- | --- |
 | `src/implementations/extreme.py` | Person 4 | case-14 attention module gains a polynomial route with a flash fallback | the memory contract is unchanged: no new resident tensor scales with `B*N*d_model`, and the existing prefix-streaming and OOM backoff still drive execution |
 | `src/dispatcher.py` | Person 1 | case-14 route may select the polynomial backend | the guard's host synchronization stays in the eager dispatch layer, never inside a compiled or graph-replayed region |
-| `docs/kernel-integration-notes.md` | Person 2 | written for Persons 1 and 4 | states the two constraints above, the measured evidence, and how to disable the route in one line |
+| `research/attention-softmax/kernel-integration-notes.md` | Person 2 | written for Persons 1 and 4 | states the two constraints above, the measured evidence, and how to disable the route in one line |
 
 **Non-negotiable across both:** the polynomial route is opt-in and reversible.
 Setting one flag returns case 14 to exactly today's forced-Flash behaviour, and

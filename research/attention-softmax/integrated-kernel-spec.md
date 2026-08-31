@@ -536,7 +536,7 @@ attention module.
 - Person 4's memory invariants hold: no resident tensor scales with
   `B*N*d_model`, prefix streaming and OOM backoff still drive execution.
 
-`docs/kernel-integration-notes.md` is updated at the end of each stage with the
+`research/attention-softmax/kernel-integration-notes.md` is updated at the end of each stage with the
 new measured numbers, not at the end of Phase 2, so Persons 1 and 4 are never
 reading a stale figure.
 

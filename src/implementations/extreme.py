@@ -241,7 +241,7 @@ class FlashOnlySDPASelfAttention(StridedSDPASelfAttention):
 # Guarded polynomial attention route for case 14. Setting this False returns
 # case 14 to exactly the forced-Flash behaviour, which
 # src/tests/test_poly_attention.py pins bitwise so it cannot rot.
-# See docs/kernel-integration-notes.md and
+# See research/attention-softmax/kernel-integration-notes.md and
 # research/attention-softmax/triton-kernel-spec.md.
 POLY_ATTENTION_ENABLED = True
 

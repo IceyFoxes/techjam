@@ -52,6 +52,10 @@ Status: current as of 31 August 2026.
   then two complete per-chunk kernels, with a persistent-slab scan specified but
   gated on measurement. Opens with a blocking noise-floor task, because four
   identical profiles on this hardware spread 2.17x.
+- [`kernel-integration-notes.md`](kernel-integration-notes.md) — cross-stream
+  integration contract for the polynomial Case 14 route: rollback control,
+  memory and synchronization constraints, correctness boundary, and measured
+  RTX 4060/5080 evidence.
 - [`triton-kernel-prior-art.md`](triton-kernel-prior-art.md) — what already
   exists for the proposed fused kernel. Key finding: `flash-linear-attention`
   implements this exact algorithm but asserts head dimension <= 16, and Based

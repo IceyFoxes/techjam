@@ -48,7 +48,7 @@
 | `src/tests/test_poly_reference.py` | scan correctness, including prefix skipping | **modify** |
 | `src/tests/test_poly_kernel.py` | kernel equivalence, including the fp16 shadow | **modify** |
 | `src/tests/test_poly_configs.py` | config table lookup and fallback | **create** |
-| `docs/kernel-integration-notes.md` | what Persons 1 and 4 need to know | **modify** at the end of Stage 0 |
+| `research/attention-softmax/kernel-integration-notes.md` | what Persons 1 and 4 need to know | **modify** at the end of Stage 0 |
 
 **Task ordering note.** The spec lists the fixes F1-F6. This plan runs them as Tasks 1-7 in a different order: **F3's fp16 shadow comes before F4's config table, and F3's `BC` half is folded into F4**, because the right `BC` cannot be chosen until the shadow exists (it changes how many bytes each row-block reads) and both are decided by the same interleaved sweep.
 
@@ -1373,7 +1373,7 @@ Stage 0 is not finished when the fixes land. It is finished when the new attribu
 
 **Files:**
 - Create: `research/benchmarks/<date>-rtx4060-<commit>/README.md`
-- Modify: `docs/kernel-integration-notes.md`
+- Modify: `research/attention-softmax/kernel-integration-notes.md`
 - Modify: `research/attention-softmax/integrated-kernel-spec.md`
 - Modify: `research/benchmarks/README.md`
 
@@ -1435,7 +1435,7 @@ State explicitly which fixes were kept, which were `WITHIN NOISE` and kept anywa
 
 - [x] **Step 7: Update the integration notes and the spec**
 
-In `docs/kernel-integration-notes.md`, replace the latency and VRAM tables with the Stage 0 figures. Persons 1 and 4 read this document; it must never carry a stale number.
+In `research/attention-softmax/kernel-integration-notes.md`, replace the latency and VRAM tables with the Stage 0 figures. Persons 1 and 4 read this document; it must never carry a stale number.
 
 In the spec, mark F1-F6 with their outcomes and record the Stage 1 decision from Step 5.
 
