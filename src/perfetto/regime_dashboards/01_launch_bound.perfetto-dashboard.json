@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "title": "Launch-bound \u2014 fewer launches, less host overhead",
+  "graph": "{\n  \"nodes\": [\n    {\n      \"nodeId\": \"0\",\n      \"type\": \"table\",\n      \"state\": {\n        \"sqlTable\": \"slice\"\n      },\n      \"nextNodes\": [\n        \"1\",\n        \"2\",\n        \"3\",\n        \"4\",\n        \"5\"\n      ]\n    },\n    {\n      \"nodeId\": \"1\",\n      \"type\": \"filter\",\n      \"state\": {\n        \"filterMode\": \"structured\",\n        \"filters\": [\n          {\n            \"column\": \"category\",\n            \"op\": \"=\",\n            \"value\": \"kernel\"\n          }\n        ],\n        \"filterOperator\": \"AND\"\n      },\n      \"nextNodes\": [\n        \"6\"\n      ],\n      \"primaryInputId\": \"0\"\n    },\n    {\n      \"nodeId\": \"6\",\n      \"type\": \"dashboard\",\n      \"state\": {\n        \"name\": \"GPU kernel slices\"\n      },\n      \"nextNodes\": [],\n      \"primaryInputId\": \"1\"\n    },\n    {\n      \"nodeId\": \"2\",\n      \"type\": \"filter\",\n      \"state\": {\n        \"filterMode\": \"structured\",\n        \"filters\": [\n          {\n            \"column\": \"category\",\n            \"op\": \"=\",\n            \"value\": \"gpu_memcpy\"\n          }\n        ],\n        \"filterOperator\": \"AND\"\n      },\n      \"nextNodes\": [\n        \"7\"\n      ],\n      \"primaryInputId\": \"0\"\n    },\n    {\n      \"nodeId\": \"7\",\n      \"type\": \"dashboard\",\n      \"state\": {\n        \"name\": \"GPU memcpy slices\"\n      },\n      \"nextNodes\": [],\n      \"primaryInputId\": \"2\"\n    },\n    {\n      \"nodeId\": \"3\",\n      \"type\": \"filter\",\n      \"state\": {\n        \"filterMode\": \"structured\",\n        \"filters\": [\n          {\n            \"column\": \"category\",\n            \"op\": \"=\",\n            \"value\": \"cuda_runtime\"\n          }\n        ],\n        \"filterOperator\": \"AND\"\n      },\n      \"nextNodes\": [\n        \"8\"\n      ],\n      \"primaryInputId\": \"0\"\n    },\n    {\n      \"nodeId\": \"8\",\n      \"type\": \"dashboard\",\n      \"state\": {\n        \"name\": \"CUDA runtime slices\"\n      },\n      \"nextNodes\": [],\n      \"primaryInputId\": \"3\"\n    },\n    {\n      \"nodeId\": \"4\",\n      \"type\": \"filter\",\n      \"state\": {\n        \"filterMode\": \"structured\",\n        \"filters\": [\n          {\n            \"column\": \"category\",\n            \"op\": \"=\",\n            \"value\": \"cpu_op\"\n          }\n        ],\n        \"filterOperator\": \"AND\"\n      },\n      \"nextNodes\": [\n        \"9\"\n      ],\n      \"primaryInputId\": \"0\"\n    },\n    {\n      \"nodeId\": \"9\",\n      \"type\": \"dashboard\",\n      \"state\": {\n        \"name\": \"CPU operator slices\"\n      },\n      \"nextNodes\": [],\n      \"primaryInputId\": \"4\"\n    },\n    {\n      \"nodeId\": \"5\",\n      \"type\": \"filter\",\n      \"state\": {\n        \"filterMode\": \"structured\",\n        \"filters\": [\n          {\n            \"column\": \"category\",\n            \"op\": \"=\",\n            \"value\": \"user_annotation\"\n          }\n        ],\n        \"filterOperator\": \"AND\"\n      },\n      \"nextNodes\": [\n        \"10\"\n      ],\n      \"primaryInputId\": \"0\"\n    },\n    {\n      \"nodeId\": \"10\",\n      \"type\": \"dashboard\",\n      \"state\": {\n        \"name\": \"Forward annotations\"\n      },\n      \"nextNodes\": [],\n      \"primaryInputId\": \"5\"\n    }\n  ],\n  \"rootNodeIds\": [\n    \"0\"\n  ],\n  \"selectedNodeId\": \"6\",\n  \"nodeLayouts\": {\n    \"0\": {\n      \"x\": 0,\n      \"y\": 380\n    },\n    \"1\": {\n      \"x\": 300,\n      \"y\": 0\n    },\n    \"2\": {\n      \"x\": 300,\n      \"y\": 190\n    },\n    \"3\": {\n      \"x\": 300,\n      \"y\": 380\n    },\n    \"4\": {\n      \"x\": 300,\n      \"y\": 570\n    },\n    \"5\": {\n      \"x\": 300,\n      \"y\": 760\n    },\n    \"6\": {\n      \"x\": 620,\n      \"y\": 0\n    },\n    \"7\": {\n      \"x\": 620,\n      \"y\": 190\n    },\n    \"8\": {\n      \"x\": 620,\n      \"y\": 380\n    },\n    \"9\": {\n      \"x\": 620,\n      \"y\": 570\n    },\n    \"10\": {\n      \"x\": 620,\n      \"y\": 760\n    }\n  },\n  \"labels\": [\n    {\n      \"id\": \"regime-story\",\n      \"x\": 20,\n      \"y\": 930,\n      \"width\": 900,\n      \"text\": \"Launch-bound \\u2014 fewer launches, less host overhead: Representative Case 3 (also Cases 2, 4, 12): packed QKV and CUDA Graph replay. Profiled GPU kernels fall 115 \\u2192 33; final paired speedup 5.959\\u00d7.\"\n    }\n  ],\n  \"isExplorerCollapsed\": true,\n  \"sidebarWidth\": 360\n}",
+  "dashboards": [
+    {
+      "id": "01_launch_bound",
+      "items": [
+        {
+          "kind": "label",
+          "id": "title",
+          "text": "LAUNCH-BOUND  \u2022  CASE 3",
+          "col": 0,
+          "row": 0,
+          "colSpan": 24,
+          "rowSpan": 2
+        },
+        {
+          "kind": "label",
+          "id": "story",
+          "text": "The work is tiny; dispatch is the workload. Compare launch count and CUDA API time before reading kernel duration.",
+          "col": 0,
+          "row": 2,
+          "colSpan": 24,
+          "rowSpan": 2
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "6",
+          "config": {
+            "id": "kernel-time",
+            "name": "GPU kernel time",
+            "column": "dur",
+            "chartType": "scorecard",
+            "aggregation": "SUM",
+            "measureColumn": "dur"
+          },
+          "col": 0,
+          "row": 4,
+          "colSpan": 6,
+          "rowSpan": 4
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "6",
+          "config": {
+            "id": "kernel-count",
+            "name": "GPU kernel launches",
+            "column": "name",
+            "chartType": "scorecard",
+            "aggregation": "COUNT"
+          },
+          "col": 6,
+          "row": 4,
+          "colSpan": 6,
+          "rowSpan": 4
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "8",
+          "config": {
+            "id": "cuda-time",
+            "name": "CUDA API time",
+            "column": "dur",
+            "chartType": "scorecard",
+            "aggregation": "SUM",
+            "measureColumn": "dur"
+          },
+          "col": 12,
+          "row": 4,
+          "colSpan": 6,
+          "rowSpan": 4
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "8",
+          "config": {
+            "id": "cuda-count",
+            "name": "CUDA API calls",
+            "column": "name",
+            "chartType": "scorecard",
+            "aggregation": "COUNT"
+          },
+          "col": 18,
+          "row": 4,
+          "colSpan": 6,
+          "rowSpan": 4
+        },
+        {
+          "kind": "divider",
+          "id": "mechanism",
+          "row": 8,
+          "label": "Mechanism: three projections become one; repeated dispatch becomes graph replay"
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "6",
+          "config": {
+            "id": "launches-kernel",
+            "name": "Launches by GPU kernel",
+            "column": "name",
+            "chartType": "bar",
+            "orientation": "horizontal",
+            "aggregation": "COUNT"
+          },
+          "col": 0,
+          "row": 9,
+          "colSpan": 12,
+          "rowSpan": 9
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "8",
+          "config": {
+            "id": "cuda-api-time",
+            "name": "CUDA runtime time by API",
+            "column": "name",
+            "chartType": "bar",
+            "orientation": "horizontal",
+            "aggregation": "SUM",
+            "measureColumn": "dur"
+          },
+          "col": 12,
+          "row": 9,
+          "colSpan": 12,
+          "rowSpan": 9
+        },
+        {
+          "kind": "divider",
+          "id": "shape",
+          "row": 18,
+          "label": "Kernel duration distribution"
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "6",
+          "config": {
+            "id": "kernel-time-name",
+            "name": "GPU time by kernel",
+            "column": "name",
+            "chartType": "bar",
+            "orientation": "horizontal",
+            "aggregation": "SUM",
+            "measureColumn": "dur"
+          },
+          "col": 0,
+          "row": 19,
+          "colSpan": 12,
+          "rowSpan": 8
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "6",
+          "config": {
+            "id": "kernel-cdf",
+            "name": "Kernel-duration CDF",
+            "column": "dur",
+            "chartType": "cdf"
+          },
+          "col": 12,
+          "row": 19,
+          "colSpan": 12,
+          "rowSpan": 8
+        },
+        {
+          "kind": "divider",
+          "id": "timeline",
+          "row": 27,
+          "label": "Launch pattern across the forward"
+        },
+        {
+          "kind": "chart",
+          "sourceNodeId": "6",
+          "config": {
+            "id": "kernel-timeline",
+            "name": "GPU kernel duration over trace time",
+            "column": "ts",
+            "chartType": "scatter",
+            "yColumn": "dur"
+          },
+          "col": 0,
+          "row": 28,
+          "colSpan": 24,
+          "rowSpan": 9
+        }
+      ]
+    }
+  ]
+}

@@ -147,6 +147,24 @@ immutable dense baseline's impossible latency. The direct FP16 candidate-only
 smoke runner remains available as
 `.venv/bin/python -m src.extreme_smoke --case 14 --dtype float16`.
 
+### Live demo dashboard
+
+For a screen-recorded walkthrough, the repository includes a zero-dependency
+terminal dashboard that runs one representative benchmark while polling GPU
+utilization, VRAM, power, temperature, and SM clocks through `nvidia-smi`:
+
+```bash
+.venv/bin/python -m src.demo_gpu_dashboard --case 13
+```
+
+The defaults deliberately use one accuracy seed and abbreviated timing so the
+command is suitable for a short demonstration. The dashboard labels these as
+demo settings and keeps the preserved full-matrix results visible for context;
+they do not replace the final five-seed, 100-sample evidence under
+`research/benchmarks/`. Run the command once before recording to populate the
+compiler cache. Cases 1--13 are accepted; Case 14 is excluded because even one
+streamed oracle trial is too long for a short live demonstration.
+
 For investigation of the likely FP32 evaluation contract, a separate validation
 oracle preserves the immutable reference's FP32 projections, normalization,
 FFN, residual, and causal-softmax semantics while evaluating attention through
@@ -240,11 +258,11 @@ override it. The output directory is created exclusively and contains:
 - operator tables sorted by self CUDA or CPU time; and
 - `metadata.json` with the command, Git state, environment, candidate, and shape.
 
-For a reusable graphical overview, import
-[`perfetto/transformer_profile_dashboard.json`](perfetto/transformer_profile_dashboard.json)
-from Perfetto's **Data Explorer**. It provides scorecards, grouped kernel bars,
-a duration histogram, a launch scatter plot, and a CDF. See
-[`perfetto/README.md`](perfetto/README.md) for the import workflow.
+For the final narrated demo, use the five regime-specific dashboards in
+[`perfetto/regime_dashboards/`](perfetto/regime_dashboards/). They pair Cases 3,
+13, 8, 6, and 14 with launch-, memory-, projection-, capacity-, and
+allocation-bound views respectively; the directory README contains the exact
+reference/candidate tab workflow.
 
 Add `--with-stack` for source stacks or `--with-flops` for supported operator
 FLOP estimates. Both add overhead. Traces can be large, so keep them outside Git
