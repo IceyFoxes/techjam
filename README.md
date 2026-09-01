@@ -27,7 +27,7 @@ immutable dense FP32 reference would require multi-terabyte attention tensors;
 the comparison uses a separately validated linear-memory FP32 oracle and labels
 its timing as diagnostic.
 
-See the [final report](https://drive.google.com/file/d/1HX_7vbzrBtaUkBMFyhFhu_Zyh3798nJG/view?usp=sharing) and
+See the [final report](final_report.pdf) and
 [preserved benchmark record](research/benchmarks/2026-08-31-rtx5080-775c820/README.md)
 for the complete result table, machine specifications, commands, memory data,
 three-reference comparison, methodology, and limitations.

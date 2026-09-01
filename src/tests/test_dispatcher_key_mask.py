@@ -41,45 +41,41 @@ class DropKeyMaskDecisionTests(unittest.TestCase):
 
     def test_reference_route_never_drops_the_mask(self) -> None:
         """The fallback must reproduce baseline arithmetic exactly."""
-        from src.dispatcher import REFERENCE_BACKEND, RouteDecision
+        from src.dispatcher import MaskKind, REFERENCE_BACKEND, RouteDecision
 
         model, _ = self._dispatcher()
         route = RouteDecision(1, REFERENCE_BACKEND, None, "test")
-        self.assertFalse(model._may_drop_key_mask(route, self._prefix_mask()))
+        self.assertFalse(model._may_drop_key_mask(route, MaskKind.PREFIX))
 
     def test_non_causal_config_never_drops_the_mask(self) -> None:
         """Without an upper triangle there is nothing to subsume the padding."""
-        from src.dispatcher import COMPILED_SDPA_BACKEND, RouteDecision
+        from src.dispatcher import COMPILED_SDPA_BACKEND, MaskKind, RouteDecision
 
         model, _ = self._dispatcher(causal=False)
         route = RouteDecision(1, COMPILED_SDPA_BACKEND, "default", "test")
-        self.assertFalse(model._may_drop_key_mask(route, self._prefix_mask()))
+        self.assertFalse(model._may_drop_key_mask(route, MaskKind.PREFIX))
 
     def test_general_mask_never_drops_the_mask(self) -> None:
         """A left-padded or gapped mask is NOT removable."""
-        from src.dispatcher import COMPILED_SDPA_BACKEND, RouteDecision
+        from src.dispatcher import COMPILED_SDPA_BACKEND, MaskKind, RouteDecision
 
         model, _ = self._dispatcher()
         route = RouteDecision(1, COMPILED_SDPA_BACKEND, "default", "test")
-        gapped = torch.tensor(
-            [[False, True, True, True, True, True, True, True],
-             [True, True, False, True, True, True, True, True]]
-        )
-        self.assertFalse(model._may_drop_key_mask(route, gapped))
+        self.assertFalse(model._may_drop_key_mask(route, MaskKind.GENERAL))
 
     def test_causal_prefix_mask_drops_the_mask(self) -> None:
-        from src.dispatcher import COMPILED_SDPA_BACKEND, RouteDecision
+        from src.dispatcher import COMPILED_SDPA_BACKEND, MaskKind, RouteDecision
 
         model, _ = self._dispatcher()
         route = RouteDecision(1, COMPILED_SDPA_BACKEND, "default", "test")
-        self.assertTrue(model._may_drop_key_mask(route, self._prefix_mask()))
+        self.assertTrue(model._may_drop_key_mask(route, MaskKind.PREFIX))
 
     def test_absent_mask_does_not_drop(self) -> None:
-        from src.dispatcher import COMPILED_SDPA_BACKEND, RouteDecision
+        from src.dispatcher import COMPILED_SDPA_BACKEND, MaskKind, RouteDecision
 
         model, _ = self._dispatcher()
         route = RouteDecision(1, COMPILED_SDPA_BACKEND, "default", "test")
-        self.assertFalse(model._may_drop_key_mask(route, None))
+        self.assertFalse(model._may_drop_key_mask(route, MaskKind.ABSENT))
 
     def test_dropping_the_mask_matches_the_reference(self) -> None:
         """End-to-end: the optimized path agrees with baseline arithmetic."""
@@ -102,23 +98,21 @@ class DropKeyMaskDecisionTests(unittest.TestCase):
             )
         self.assertTrue(result.passed, msg=f"{result.failed_elements} failed")
 
-    def test_decision_is_not_taken_per_forward(self) -> None:
+    def test_mask_is_not_classified_per_forward(self) -> None:
         """The host sync costs ~85-99us; it must not run on every call."""
-        from src.dispatcher import DispatchingTransformer
+        import src.dispatcher as dispatcher
 
-        model, config = self._dispatcher()
+        model, _ = self._dispatcher()
         model.eval()
         calls = []
-        original = DispatchingTransformer._may_drop_key_mask
+        original = dispatcher.classify_mask
 
-        def counting(self, route, mask):
-            calls.append(route)
-            return original(self, route, mask)
+        def counting(mask):
+            calls.append(mask)
+            return original(mask)
 
-        DispatchingTransformer._may_drop_key_mask = counting
-        self.addCleanup(
-            setattr, DispatchingTransformer, "_may_drop_key_mask", original
-        )
+        dispatcher.classify_mask = counting
+        self.addCleanup(setattr, dispatcher, "classify_mask", original)
 
         mask = self._prefix_mask()
         x = torch.randn(2, 8, 16).masked_fill(~mask[..., None], 0)
@@ -126,9 +120,44 @@ class DropKeyMaskDecisionTests(unittest.TestCase):
             for _ in range(5):
                 model(x, mask)
 
-        # CPU routes to the reference backend, which resolves before the
-        # decision is reached; either way it must not scale with call count.
-        self.assertLessEqual(len(calls), 1, msg=f"{len(calls)} syncs in 5 calls")
+        self.assertEqual(len(calls), 1, msg=f"{len(calls)} syncs in 5 calls")
+
+    def test_runtime_key_distinguishes_mask_structure(self) -> None:
+        """A cached prefix route must never be reused for a general mask."""
+
+        model, _ = self._dispatcher()
+        x = torch.randn(2, 8, 16)
+        prefix = self._prefix_mask()
+        general = prefix.clone()
+        general[0, 0] = False
+
+        prefix_key = model._runtime_key(x, prefix)
+        general_key = model._runtime_key(x, general)
+        repeated_prefix_key = model._runtime_key(x, prefix)
+
+        self.assertNotEqual(prefix_key, general_key)
+        self.assertEqual(prefix_key, repeated_prefix_key)
+
+    def test_inference_tensor_mask_is_cached_without_a_version_counter(self) -> None:
+        model, _ = self._dispatcher()
+        x = torch.randn(2, 8, 16)
+        with torch.inference_mode():
+            mask = self._prefix_mask()
+            first = model._runtime_key(x, mask)
+            second = model._runtime_key(x, mask)
+
+        self.assertEqual(first, second)
+
+    def test_in_place_mask_change_invalidates_classification(self) -> None:
+        model, _ = self._dispatcher()
+        x = torch.randn(2, 8, 16)
+        mask = self._prefix_mask()
+
+        prefix_key = model._runtime_key(x, mask)
+        mask[0, 0] = False
+        general_key = model._runtime_key(x, mask)
+
+        self.assertNotEqual(prefix_key, general_key)
 
 
 if __name__ == "__main__":
