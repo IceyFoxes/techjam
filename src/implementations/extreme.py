@@ -249,11 +249,11 @@ POLY_ATTENTION_ENABLED = True
 class PolyOrFlashSelfAttention(FlashOnlySDPASelfAttention):
     """Case-14 attention that may use the polynomial kernel, guarded.
 
-    Memory behaviour is unchanged from the Flash-only parent: the polynomial
-    state is ``[H, d^2, d]``, independent of both ``N`` and the batch, and the
-    per-chunk working tensors are ``[H, chunk, d]``. Nothing here scales with
-    ``B*N*d_model``, so the caller's prefix streaming and OOM backoff still
-    drive execution.
+    The polynomial state is ``[B_chunk*H, d^2, d]``, independent of sequence
+    length, and its scan workspace is bounded by a fixed token chunk. Q/K/V and
+    output activations still scale with ``B_chunk*N*d_model``; the caller's
+    batch/prefix streaming caps ``B_chunk`` and its OOM backoff still governs
+    peak memory.
 
     The approximation is only valid while scores stay small, which is a property
     of the benchmark's random initialisation rather than of attention. When the

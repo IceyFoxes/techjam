@@ -192,7 +192,7 @@ class DispatcherExecutionTests(unittest.TestCase):
 
     @staticmethod
     def _cuda_runtime_key(input_shape, *, mask_present=True):
-        from src.dispatcher import RuntimeKey
+        from src.dispatcher import MaskKind, RuntimeKey
 
         return RuntimeKey(
             input_shape=tuple(input_shape),
@@ -201,7 +201,7 @@ class DispatcherExecutionTests(unittest.TestCase):
             dtype=torch.float32,
             device_name="NVIDIA GeForce RTX 5080",
             device_capability=(12, 0),
-            mask_present=mask_present,
+            mask_kind=(MaskKind.PREFIX if mask_present else MaskKind.ABSENT),
             inference_mode=True,
             grad_enabled=False,
             matmul_precision="high",

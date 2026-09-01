@@ -61,36 +61,33 @@ class ExtremeKeyMaskTests(unittest.TestCase):
         return DispatchingTransformer(config), config
 
     def test_extreme_backend_is_eligible_to_drop_a_prefix_key_mask(self):
-        from src.dispatcher import EXTREME_MEMORY_BACKEND
+        from src.dispatcher import EXTREME_MEMORY_BACKEND, MaskKind
 
-        model, config = self._model(6)
-        mask = self._prefix_mask(2, config.seq_len, config.seq_len // 2)
+        model, _ = self._model(6)
         self.assertTrue(
             model._may_drop_key_mask(
-                self._route(EXTREME_MEMORY_BACKEND, 6), mask
+                self._route(EXTREME_MEMORY_BACKEND, 6), MaskKind.PREFIX
             )
         )
 
     def test_extreme_backend_keeps_a_non_prefix_key_mask(self):
-        from src.dispatcher import EXTREME_MEMORY_BACKEND
+        from src.dispatcher import EXTREME_MEMORY_BACKEND, MaskKind
 
-        model, config = self._model(6)
-        mask = self._prefix_mask(2, config.seq_len, config.seq_len // 2)
-        # Punch an interior hole: no longer right-padded, so not removable.
-        mask[0, 0] = False
+        model, _ = self._model(6)
         self.assertFalse(
             model._may_drop_key_mask(
-                self._route(EXTREME_MEMORY_BACKEND, 6), mask
+                self._route(EXTREME_MEMORY_BACKEND, 6), MaskKind.GENERAL
             )
         )
 
     def test_reference_backend_never_drops_the_key_mask(self):
-        from src.dispatcher import REFERENCE_BACKEND
+        from src.dispatcher import MaskKind, REFERENCE_BACKEND
 
-        model, config = self._model(6)
-        mask = self._prefix_mask(2, config.seq_len, config.seq_len // 2)
+        model, _ = self._model(6)
         self.assertFalse(
-            model._may_drop_key_mask(self._route(REFERENCE_BACKEND, 6), mask)
+            model._may_drop_key_mask(
+                self._route(REFERENCE_BACKEND, 6), MaskKind.PREFIX
+            )
         )
 
     def test_extreme_route_does_not_inherit_a_stale_flag(self):
